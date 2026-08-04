@@ -63,6 +63,9 @@ target_link_libraries(test_search PRIVATE ultc_lib)
 add_executable(test_stats tests/test_stats.c)
 target_link_libraries(test_stats PRIVATE ultc_lib)
 
+add_executable(test_integration tests/test_integration.c)
+target_link_libraries(test_integration PRIVATE ultc_lib)
+
 # ============================================================
 # 后续版本测试 target 占位：
 # add_executable(test_auth tests/test_auth.c)
