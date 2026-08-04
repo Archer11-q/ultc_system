@@ -10,6 +10,7 @@
 #include "material.h"
 #include "borrow.h"
 #include "inventory.h"
+#include "search.h"
 #include "ui.h"
 
 #include <stdio.h>
@@ -656,8 +657,8 @@ static void menu_inventory_stocktake(void) {
 }
 
 /* ---- 检索 ---- */
-static void menu_search_material(void) { placeholder("耗材检索"); }
-static void menu_search_record(void)   { placeholder("领用记录检索"); }
+static void menu_search_material(void) { search_material_menu(); }
+static void menu_search_record(void)   { search_record_menu(); }
 
 /* ---- 统计 ---- */
 static void menu_stats(void)           { placeholder("数据统计"); }

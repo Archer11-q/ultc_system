@@ -451,6 +451,38 @@ const char* material_attr_name(int attr) {
 }
 
 /* ============================================================
+ * 模糊搜索
+ * ============================================================ */
+
+Material* material_search_by_name(const char* keyword, int* out_count) {
+    *out_count = 0;
+    if (!keyword || keyword[0] == '\0') return NULL;
+
+    /* 统计匹配数 */
+    int total = 0;
+    Material* p = g_mat_list;
+    while (p) {
+        if (strstr(p->name, keyword)) total++;
+        p = p->next;
+    }
+    if (total == 0) return NULL;
+
+    Material* arr = (Material*)malloc(sizeof(Material) * total);
+    if (!arr) return NULL;
+
+    int idx = 0;
+    p = g_mat_list;
+    while (p && idx < total) {
+        if (strstr(p->name, keyword)) {
+            arr[idx++] = *p;
+        }
+        p = p->next;
+    }
+    *out_count = total;
+    return arr;
+}
+
+/* ============================================================
  * 库存预警与采购清单
  * ============================================================ */
 

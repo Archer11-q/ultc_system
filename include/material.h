@@ -147,6 +147,14 @@ const char* material_attr_name(int attr);
 void material_alert_print(void);
 
 /**
+ * @brief 按名称模糊搜索耗材
+ * @param keyword   搜索关键词（子串匹配）
+ * @param out_count 输出参数，匹配条数
+ * @return 匹配的耗材数组（调用方 free），无匹配返回 NULL
+ */
+Material* material_search_by_name(const char* keyword, int* out_count);
+
+/**
  * @brief 打印采购清单
  * @details 列出所有预警耗材，含建议采购量（min_stock × 2 - total_stock）
  *          和预估金额，底部汇总总金额。
