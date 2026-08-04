@@ -25,6 +25,7 @@ add_library(ultc_lib STATIC
     src/ui.c
     src/platform.c
     src/auth.c
+    src/material.c
 )
 target_include_directories(ultc_lib PUBLIC include)
 
@@ -42,6 +43,9 @@ target_link_libraries(test_file_io PRIVATE ultc_lib)
 
 add_executable(test_auth tests/test_auth.c)
 target_link_libraries(test_auth PRIVATE ultc_lib)
+
+add_executable(test_material tests/test_material.c)
+target_link_libraries(test_material PRIVATE ultc_lib)
 
 # ============================================================
 # 后续版本测试 target 占位：

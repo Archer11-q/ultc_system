@@ -7,6 +7,7 @@
 #include "types.h"
 #include "platform.h"
 #include "auth.h"
+#include "material.h"
 #include "ui.h"
 
 #include <stdio.h>
@@ -23,10 +24,170 @@ static void placeholder(const char* module) {
 }
 
 /* ---- 耗材管理 ---- */
-static void menu_material_add(void)    { placeholder("新增耗材"); }
-static void menu_material_edit(void)   { placeholder("修改耗材"); }
-static void menu_material_delete(void) { placeholder("删除耗材"); }
-static void menu_material_list(void)   { placeholder("耗材列表"); }
+
+/** 输入分类 */
+static int input_category(void) {
+    printf("\n  分类: 1.电子元器件 2.电工工具 3.开发板 4.化学耗材 5.机械零件\n");
+    int c = read_int("  请选择: ", 1, 5);
+    return c - 1;  /* 转为枚举值 0~4 */
+}
+
+/** 输入属性 */
+static int input_attr(void) {
+    printf("\n  属性: 1.一次性  2.可循环复用\n");
+    int a = read_int("  请选择: ", 1, 2);
+    return a - 1;
+}
+
+/** 输入日期（YYYY-MM-DD -> time_t） */
+static time_t input_date(void) {
+    char buf[16];
+    read_string("  采购日期 (YYYY-MM-DD): ", buf, sizeof(buf));
+
+    struct tm tm = {0};
+    if (sscanf(buf, "%d-%d-%d", &tm.tm_year, &tm.tm_mon, &tm.tm_mday) != 3) {
+        return time(NULL);  /* 解析失败用当前时间 */
+    }
+    tm.tm_year -= 1900;
+    tm.tm_mon  -= 1;
+    tm.tm_isdst = -1;
+    return mktime(&tm);
+}
+
+static void menu_material_add(void) {
+    print_title("新增耗材");
+
+    Material mat;
+    memset(&mat, 0, sizeof(mat));
+
+    read_string("  耗材编号: ", mat.id, sizeof(mat.id));
+    if (material_find_by_id(mat.id)) {
+        printf("\n  [错误] 编号 '%s' 已存在，请使用其他编号。\n", mat.id);
+        pause_screen();
+        return;
+    }
+
+    read_string("  耗材名称: ", mat.name, sizeof(mat.name));
+    mat.category = input_category();
+    mat.attr     = input_attr();
+    mat.unit_price  = read_double("  采购单价: ", 0.00, 999999.99);
+    mat.total_stock = read_int("  初始库存: ", 0, 999999);
+    mat.min_stock   = read_int("  最低预警库存: ", 0, mat.total_stock);
+    read_string("  存放柜号: ", mat.cabinet, sizeof(mat.cabinet));
+    mat.purchase_date = input_date();
+
+    int ret = material_add(&mat);
+    if (ret == 0) {
+        printf("\n  [提示] 耗材 '%s' 添加成功。\n", mat.id);
+    } else {
+        printf("\n  [错误] 添加失败（%d）。\n", ret);
+    }
+    pause_screen();
+}
+
+static void menu_material_edit(void) {
+    print_title("修改耗材");
+
+    char id[MAX_MAT_ID];
+    read_string("  要修改的耗材编号: ", id, sizeof(id));
+
+    const Material* old = material_find_by_id(id);
+    if (!old) {
+        printf("\n  [错误] 耗材 '%s' 不存在。\n", id);
+        pause_screen();
+        return;
+    }
+
+    /* 显示当前值 */
+    printf("\n  当前信息:\n");
+    printf("  名称: %s | 库存: %d | 预警: %d | 柜号: %s | 单价: %.2f\n",
+           old->name, old->total_stock, old->min_stock,
+           old->cabinet, old->unit_price);
+
+    Material mat = *old;  /* 拷贝当前值作为默认 */
+
+    printf("\n  （直接回车保留原值，输入 '-' 回车跳过名称）\n\n");
+
+    char buf[128];
+    read_string("  新名称: ", buf, sizeof(buf));
+    if (buf[0] != '\0' && strcmp(buf, "-") != 0) {
+        strncpy(mat.name, buf, sizeof(mat.name) - 1);
+    }
+
+    mat.total_stock = read_int("  新库存量: ", 0, 999999);
+    mat.min_stock   = read_int("  新预警值: ", 0, mat.total_stock);
+    read_string("  新柜号: ", buf, sizeof(buf));
+    if (buf[0] != '\0' && strcmp(buf, "-") != 0) {
+        strncpy(mat.cabinet, buf, sizeof(mat.cabinet) - 1);
+    }
+    mat.unit_price = read_double("  新单价: ", 0.00, 999999.99);
+
+    int ret = material_update(&mat);
+    if (ret == 0) {
+        printf("\n  [提示] 耗材 '%s' 修改成功。\n", id);
+    } else {
+        printf("\n  [错误] 修改失败。\n");
+    }
+    pause_screen();
+}
+
+static void menu_material_delete(void) {
+    print_title("删除耗材");
+
+    char id[MAX_MAT_ID];
+    read_string("  要删除的耗材编号: ", id, sizeof(id));
+
+    const Material* mat = material_find_by_id(id);
+    if (!mat) {
+        printf("\n  [错误] 耗材 '%s' 不存在。\n", id);
+        pause_screen();
+        return;
+    }
+
+    printf("\n  名称: %s | 库存: %d | 分类: %s\n",
+           mat->name, mat->total_stock,
+           material_category_name(mat->category));
+
+    if (!confirm("\n  确认删除该耗材？")) return;
+
+    int ret = material_delete(id);
+    if (ret == 0) {
+        printf("\n  [提示] 耗材 '%s' 已删除。\n", id);
+    } else {
+        printf("\n  [错误] 删除失败。\n");
+    }
+    pause_screen();
+}
+
+static void menu_material_list(void) {
+    int page = 1;
+    int total_pages = 1;
+    int running = 1;
+
+    while (running) {
+        print_title("耗材列表（分页）");
+        material_list_page(page, &total_pages);
+
+        if (material_count() == 0) {
+            printf("\n  [提示] 耗材库为空，请先新增耗材。\n");
+            pause_screen();
+            return;
+        }
+
+        printf("\n  [N]下一页  [P]上一页  [Q]返回");
+        char buf[8];
+        read_string("  → ", buf, sizeof(buf));
+
+        switch (buf[0]) {
+        case 'n': case 'N':
+            if (page < total_pages) { page++; } break;
+        case 'p': case 'P':
+            if (page > 1) { page--; } break;
+        case 'q': case 'Q':
+            running = 0; break;
+        }
+    }
+}
 
 /* ---- 领用归还 ---- */
 static void menu_borrow_new(void)      { placeholder("学生领用"); }
@@ -301,9 +462,14 @@ int main(void) {
     system("mkdir -p data");
 #endif
 
-    /* 初始化认证模块 */
+    /* 初始化各模块 */
     if (auth_init() != 0) {
         fprintf(stderr, "[致命错误] 认证模块初始化失败，程序退出。\n");
+        return 1;
+    }
+    if (material_init() != 0) {
+        fprintf(stderr, "[致命错误] 耗材模块初始化失败，程序退出。\n");
+        auth_shutdown();
         return 1;
     }
 
@@ -329,6 +495,7 @@ int main(void) {
         }
     }
 
+    material_shutdown();
     auth_shutdown();
     printf("\n  感谢使用，再见！\n");
     return 0;
