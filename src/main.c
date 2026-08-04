@@ -1,13 +1,12 @@
 /**
  * @file    main.c
- * @brief   主入口 — 主菜单路由 + 全局状态
- * @details v0.1 阶段仅为菜单骨架，所有功能模块入口为占位函数，
- *          后续版本逐一替换为真实实现。
+ * @brief   主入口 — 主菜单路由
+ * @details 负责登录/菜单分发，具体业务逻辑委托各模块。
  */
 
 #include "types.h"
 #include "platform.h"
-#include "file_io.h"
+#include "auth.h"
 #include "ui.h"
 
 #include <stdio.h>
@@ -15,32 +14,11 @@
 #include <string.h>
 
 /* ============================================================
- * 全局状态
- * ============================================================ */
-
-/** 当前登录用户名，空串表示未登录 */
-static char g_current_user[MAX_USERNAME] = "";
-
-/** 当前登录角色，-1 表示未登录 */
-static int  g_current_role = -1;
-
-/* ============================================================
  * 占位函数（后续版本实现）
  * ============================================================ */
 
 static void placeholder(const char* module) {
     printf("\n  [提示] %s 模块将在后续版本中实现。\n", module);
-    pause_screen();
-}
-
-static void do_login(void) {
-    placeholder("登录认证");
-}
-
-static void do_logout(void) {
-    g_current_user[0] = '\0';
-    g_current_role = -1;
-    printf("\n  [提示] 已退出登录。\n");
     pause_screen();
 }
 
@@ -56,7 +34,7 @@ static void menu_borrow_return(void)   { placeholder("耗材归还"); }
 static void menu_borrow_overdue(void)  { placeholder("逾期管理"); }
 
 /* ---- 预警盘点 ---- */
-static void menu_inventory_alert(void)   { placeholder("库存预警"); }
+static void menu_inventory_alert(void)    { placeholder("库存预警"); }
 static void menu_inventory_stocktake(void) { placeholder("库存盘点"); }
 
 /* ---- 检索 ---- */
@@ -67,6 +45,166 @@ static void menu_search_record(void)   { placeholder("领用记录检索"); }
 static void menu_stats(void)           { placeholder("数据统计"); }
 
 /* ============================================================
+ * 登录流程
+ * ============================================================ */
+
+static void do_login(void) {
+    char username[MAX_USERNAME];
+    char password[MAX_PASSWORD];
+
+    printf("\n");
+    read_string("  用户名: ", username, sizeof(username));
+    get_password(password, sizeof(password));
+
+    int result = auth_login(username, password);
+
+    switch (result) {
+    case AUTH_OK: {
+        const char* role_name = (auth_current_role() == ROLE_ADMIN)
+                                    ? "管理员" : "助教";
+        printf("\n  [提示] 登录成功！欢迎 %s（%s）\n",
+               auth_current_user(), role_name);
+        pause_screen();
+        break;
+    }
+    case AUTH_USER_NOT_FOUND:
+        printf("\n  [错误] 用户名不存在。\n");
+        pause_screen();
+        break;
+    case AUTH_WRONG_PASSWORD: {
+        /* 检查是否因本次错误导致了锁定 */
+        int remaining = auth_lock_remaining(username);
+        if (remaining > 0) {
+            set_color_red();
+            printf("\n  [错误] 密码连续错误 %d 次，账号已锁定 %d 秒。\n",
+                   MAX_LOGIN_ATTEMPTS, remaining);
+            reset_color();
+        } else {
+            printf("\n  [错误] 密码错误。\n");
+        }
+        pause_screen();
+        break;
+    }
+    case AUTH_LOCKED: {
+        int remaining = auth_lock_remaining(username);
+        set_color_red();
+        printf("\n  [错误] 账号已锁定，请 %d 秒后重试。\n", remaining);
+        reset_color();
+        pause_screen();
+        break;
+    }
+    default:
+        printf("\n  [错误] 未知错误（%d）。\n", result);
+        pause_screen();
+        break;
+    }
+}
+
+static void do_logout(void) {
+    printf("\n  [提示] 已退出登录（%s）。\n", auth_current_user());
+    auth_logout();
+    pause_screen();
+}
+
+/* ============================================================
+ * 管理员管理子菜单（仅 ROLE_ADMIN）
+ * ============================================================ */
+
+static void menu_admin_manage_add(void) {
+    char username[MAX_USERNAME];
+    char password[MAX_PASSWORD];
+    int role_choice;
+
+    printf("\n");
+    read_string("  新用户名: ", username, sizeof(username));
+    get_password(password, sizeof(password));
+
+    printf("\n  角色: 1. 管理员  2. 助教\n");
+    role_choice = read_int("  请选择: ", 1, 2);
+    int role = (role_choice == 1) ? ROLE_ADMIN : ROLE_TA;
+
+    int ret = auth_add_admin(username, password, role);
+    if (ret == AUTH_OK) {
+        printf("\n  [提示] 管理员 '%s' 添加成功。\n", username);
+    } else if (ret == AUTH_ALREADY_EXISTS) {
+        printf("\n  [错误] 用户名 '%s' 已存在。\n", username);
+    } else {
+        printf("\n  [错误] 添加失败。\n");
+    }
+    pause_screen();
+}
+
+static void menu_admin_manage_delete(void) {
+    auth_list_admins();
+
+    char username[MAX_USERNAME];
+    printf("\n");
+    read_string("  要删除的用户名: ", username, sizeof(username));
+
+    if (strcmp(username, auth_current_user()) == 0) {
+        printf("\n  [错误] 不能删除当前登录的账号。\n");
+        pause_screen();
+        return;
+    }
+
+    if (!confirm("\n  确认删除该管理员？")) {
+        return;
+    }
+
+    int ret = auth_delete_admin(username);
+    if (ret == 0) {
+        printf("\n  [提示] 管理员 '%s' 已删除。\n", username);
+    } else {
+        printf("\n  [错误] 删除失败（用户不存在）。\n");
+    }
+    pause_screen();
+}
+
+static void menu_admin_manage_chpwd(void) {
+    char username[MAX_USERNAME];
+    char new_password[MAX_PASSWORD];
+
+    printf("\n");
+    read_string("  目标用户名（回车=修改自己）: ", username, sizeof(username));
+
+    if (username[0] == '\0') {
+        strncpy(username, auth_current_user(), sizeof(username) - 1);
+    }
+
+    get_password(new_password, sizeof(new_password));
+
+    int ret = auth_change_password(username, new_password);
+    if (ret == 0) {
+        printf("\n  [提示] 密码修改成功。\n");
+    } else {
+        printf("\n  [错误] 密码修改失败。\n");
+    }
+    pause_screen();
+}
+
+static void menu_admin_manage(void) {
+    int running = 1;
+    while (running) {
+        print_title("管理员管理");
+        auth_list_admins();
+
+        printf("\n  1. 新增管理员\n");
+        printf("  2. 删除管理员\n");
+        printf("  3. 修改密码\n");
+        printf("  0. 返回\n");
+
+        int choice = read_int("\n  请选择: ", 0, 3);
+
+        switch (choice) {
+        case 0: running = 0; break;
+        case 1: menu_admin_manage_add();    break;
+        case 2: menu_admin_manage_delete(); break;
+        case 3: menu_admin_manage_chpwd();  break;
+        }
+    }
+}
+
+/* ============================================================
  * 管理员菜单
  * ============================================================ */
 
@@ -74,7 +212,7 @@ static void menu_admin(void) {
     int running = 1;
     while (running) {
         print_title("高校实验室实训耗材智能管理系统");
-        printf("  当前用户: %s (管理员)\n\n", g_current_user);
+        printf("  当前用户: %s（管理员）\n\n", auth_current_user());
 
         printf("  ── 耗材管理 ──\n");
         printf("  1. 新增耗材          2. 修改耗材\n");
@@ -107,7 +245,7 @@ static void menu_admin(void) {
         case 10: menu_search_material(); break;
         case 11: menu_search_record();   break;
         case 12: menu_stats();           break;
-        case 13: placeholder("管理员管理"); break;
+        case 13: menu_admin_manage();    break;
         case 14: do_logout();            break;
         }
     }
@@ -121,7 +259,7 @@ static void menu_ta(void) {
     int running = 1;
     while (running) {
         print_title("高校实验室实训耗材智能管理系统");
-        printf("  当前用户: %s (助教 — 仅查询权限)\n\n", g_current_user);
+        printf("  当前用户: %s（助教 — 仅查询权限）\n\n", auth_current_user());
 
         printf("  1. 耗材列表（分页）\n");
         printf("  2. 库存预警\n");
@@ -154,7 +292,6 @@ int main(void) {
 #ifdef _WIN32
     system("chcp 65001 > nul");
 #endif
-    /* 禁用 stdout 缓冲，确保 printf 立即输出 */
     setbuf(stdout, NULL);
 
     /* 确保数据目录存在 */
@@ -164,10 +301,16 @@ int main(void) {
     system("mkdir -p data");
 #endif
 
+    /* 初始化认证模块 */
+    if (auth_init() != 0) {
+        fprintf(stderr, "[致命错误] 认证模块初始化失败，程序退出。\n");
+        return 1;
+    }
+
     /* 主循环 */
     int running = 1;
     while (running) {
-        if (g_current_role == -1) {
+        if (auth_current_role() == -1) {
             /* 未登录 */
             print_title("高校实验室实训耗材智能管理系统");
             printf("\n");
@@ -177,17 +320,16 @@ int main(void) {
             int choice = read_int("\n  请选择: ", 0, 1);
             switch (choice) {
             case 1: do_login(); break;
-            case 0:
-                running = 0;
-                break;
+            case 0: running = 0; break;
             }
-        } else if (g_current_role == ROLE_ADMIN) {
+        } else if (auth_current_role() == ROLE_ADMIN) {
             menu_admin();
         } else {
             menu_ta();
         }
     }
 
+    auth_shutdown();
     printf("\n  感谢使用，再见！\n");
     return 0;
 }
