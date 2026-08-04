@@ -12,6 +12,8 @@
 #include "inventory.h"
 #include "search.h"
 #include "stats.h"
+#include "audit.h"
+#include "csv_io.h"
 #include "ui.h"
 
 #include <stdio.h>
@@ -78,6 +80,7 @@ static void menu_material_add(void) {
     int ret = material_add(&mat);
     if (ret == 0) {
         printf("\n  [提示] 耗材 '%s' 添加成功。\n", mat.id);
+        audit_log(AUDIT_MAT_ADD, mat.id, mat.name, auth_current_user());
     } else {
         printf("\n  [错误] 添加失败（%d）。\n", ret);
     }
@@ -124,6 +127,7 @@ static void menu_material_edit(void) {
     int ret = material_update(&mat);
     if (ret == 0) {
         printf("\n  [提示] 耗材 '%s' 修改成功。\n", id);
+        audit_log(AUDIT_MAT_EDIT, id, mat.name, auth_current_user());
     } else {
         printf("\n  [错误] 修改失败。\n");
     }
@@ -152,6 +156,7 @@ static void menu_material_delete(void) {
     int ret = material_delete(id);
     if (ret == 0) {
         printf("\n  [提示] 耗材 '%s' 已删除。\n", id);
+        audit_log(AUDIT_MAT_DELETE, id, mat->name, auth_current_user());
     } else {
         printf("\n  [错误] 删除失败。\n");
     }
@@ -374,6 +379,7 @@ static void menu_borrow_new(void) {
     print_title("领用回执");
     print_receipt(record_id, student_id, student_name,
                   class_name, project_id);
+    audit_log(AUDIT_BORROW, record_id, student_name, auth_current_user());
     pause_screen();
 }
 
@@ -467,11 +473,13 @@ static void menu_borrow_return(void) {
                            auth_current_user());
         }
         borrow_return_session(record_id, damage_note);
+        audit_log(AUDIT_RETURN, record_id, damage_note, auth_current_user());
         set_color_yellow();
         printf("\n  [提示] 已登记损坏并转入报废台账，库存已扣减。\n");
         reset_color();
     } else {
         borrow_return_session(record_id, "");
+        audit_log(AUDIT_RETURN, record_id, "正常归还", auth_current_user());
         set_color_green();
         printf("\n  [提示] 归还成功，库存未变动。\n");
         reset_color();
@@ -633,6 +641,8 @@ static void menu_inventory_stocktake(void) {
         if (diff != -999999) {
             checked++;
             if (auto_correct) {
+                audit_log(AUDIT_STOCKTAKE, mat_id, "修正库存差异",
+                          auth_current_user());
                 set_color_green();
                 printf("  [提示] 已修正，差异 %+d。\n", diff);
                 reset_color();
@@ -658,6 +668,116 @@ static void menu_search_record(void)   { search_record_menu(); }
 
 /* ---- 统计 ---- */
 static void menu_stats(void)           { stats_menu(); }
+
+/* ---- CSV 导入导出 ---- */
+
+static void menu_csv_import(void) {
+    print_title("CSV 批量导入耗材");
+
+    printf("\n  CSV 格式: 编号,名称,分类,属性,单价,库存,预警,柜号,采购日期\n");
+    printf("  分类支持: 电子元器件/电工工具/开发板/化学耗材/机械零件\n");
+    printf("  属性: 一次性/可循环\n");
+    printf("  日期: YYYY-MM-DD\n\n");
+
+    char path[256];
+    read_string("  CSV 文件路径: ", path, sizeof(path));
+    csv_import_materials(path, auth_current_user());
+    pause_screen();
+}
+
+static void menu_csv_export(void) {
+    int running = 1;
+    while (running) {
+        print_title("CSV 导出");
+        printf("\n  1. 导出全部耗材\n");
+        printf("  2. 导出采购清单\n");
+        printf("  3. 导出领用记录\n");
+        printf("  0. 返回\n");
+
+        int choice = read_int("\n  请选择: ", 0, 3);
+        if (choice == 0) { running = 0; continue; }
+
+        char path[256];
+        char default_name[64];
+        time_t now = time(NULL);
+        char date[16];
+        strftime(date, sizeof(date), "%Y%m%d", localtime(&now));
+
+        switch (choice) {
+        case 1:
+            snprintf(default_name, sizeof(default_name),
+                     "materials_%s.csv", date);
+            printf("  导出文件（回车= %s）: ", default_name);
+            break;
+        case 2:
+            snprintf(default_name, sizeof(default_name),
+                     "purchase_%s.csv", date);
+            printf("  导出文件（回车= %s）: ", default_name);
+            break;
+        case 3:
+            snprintf(default_name, sizeof(default_name),
+                     "borrows_%s.csv", date);
+            printf("  导出文件（回车= %s）: ", default_name);
+            break;
+        }
+
+        read_string("", path, sizeof(path));
+        if (path[0] == '\0') strncpy(path, default_name, sizeof(path)-1);
+
+        switch (choice) {
+        case 1: csv_export_materials(path);      break;
+        case 2: csv_export_purchase_list(path);  break;
+        case 3: csv_export_borrow_records(path); break;
+        }
+        pause_screen();
+    }
+}
+
+/* ---- 审计日志 ---- */
+
+static void menu_audit_view(void) {
+    int running = 1, page = 1, total_pages = 1;
+    int filter_action = -1;
+    char filter_user[MAX_USERNAME] = "";
+
+    while (running) {
+        print_title("操作审计日志");
+        audit_list_page(page, &total_pages, filter_action, filter_user);
+
+        if (audit_count() == 0) {
+            printf("\n  [提示] 暂无审计日志。\n");
+            pause_screen();
+            return;
+        }
+
+        printf("\n  [N]下一页 [P]上一页 [F]筛选 [R]重置筛选 [Q]返回  → ");
+        char buf[16];
+        read_string("", buf, sizeof(buf));
+
+        switch (buf[0]) {
+        case 'n': case 'N':
+            if (page < total_pages) { page++; } break;
+        case 'p': case 'P':
+            if (page > 1) { page--; } break;
+        case 'f': case 'F': {
+            printf("\n  操作类型（-1=全部, 2=新增耗材, 6=领用, 7=归还...）: ");
+            filter_action = read_int("", -1, 12);
+            printf("  操作者（回车=全部）: ");
+            read_string("", filter_user, sizeof(filter_user));
+            page = 1;
+            break;
+        }
+        case 'r': case 'R':
+            filter_action = -1;
+            filter_user[0] = '\0';
+            page = 1;
+            break;
+        default:
+            running = 0;
+            break;
+        }
+    }
+}
 
 /* ============================================================
  * 登录流程
@@ -740,6 +860,8 @@ static void menu_admin_manage_add(void) {
 
     int ret = auth_add_admin(username, password, role);
     if (ret == AUTH_OK) {
+        audit_log(AUDIT_ADMIN_ADD, username, "新增管理员",
+                  auth_current_user());
         printf("\n  [提示] 管理员 '%s' 添加成功。\n", username);
     } else if (ret == AUTH_ALREADY_EXISTS) {
         printf("\n  [错误] 用户名 '%s' 已存在。\n", username);
@@ -768,6 +890,8 @@ static void menu_admin_manage_delete(void) {
 
     int ret = auth_delete_admin(username);
     if (ret == 0) {
+        audit_log(AUDIT_ADMIN_DEL, username, "删除管理员",
+                  auth_current_user());
         printf("\n  [提示] 管理员 '%s' 已删除。\n", username);
     } else {
         printf("\n  [错误] 删除失败（用户不存在）。\n");
@@ -790,6 +914,8 @@ static void menu_admin_manage_chpwd(void) {
 
     int ret = auth_change_password(username, new_password);
     if (ret == 0) {
+        audit_log(AUDIT_ADMIN_CHPWD, username, "修改密码",
+                  auth_current_user());
         printf("\n  [提示] 密码修改成功。\n");
     } else {
         printf("\n  [错误] 密码修改失败。\n");
@@ -841,10 +967,12 @@ static void menu_admin(void) {
         printf("  10. 耗材检索         11. 领用记录检索\n");
         printf("  12. 数据统计\n");
         printf("\n  ── 系统 ──\n");
-        printf("  13. 管理员管理       14. 退出登录\n");
+        printf("  13. 管理员管理       14. CSV批量导入\n");
+        printf("  15. CSV导出          16. 操作审计日志\n");
+        printf("  17. 退出登录\n");
         printf("  0. 退出系统\n");
 
-        int choice = read_int("\n  请选择: ", 0, 14);
+        int choice = read_int("\n  请选择: ", 0, 17);
 
         switch (choice) {
         case 0:  running = 0; do_logout(); break;
@@ -861,7 +989,10 @@ static void menu_admin(void) {
         case 11: menu_search_record();   break;
         case 12: menu_stats();           break;
         case 13: menu_admin_manage();    break;
-        case 14: do_logout();            break;
+        case 14: menu_csv_import();      break;
+        case 15: menu_csv_export();      break;
+        case 16: menu_audit_view();      break;
+        case 17: do_logout();            break;
         }
     }
 }
@@ -939,6 +1070,14 @@ int main(void) {
         auth_shutdown();
         return 1;
     }
+    if (audit_init() != 0) {
+        fprintf(stderr, "[致命错误] 审计模块初始化失败，程序退出。\n");
+        inventory_shutdown();
+        borrow_shutdown();
+        material_shutdown();
+        auth_shutdown();
+        return 1;
+    }
 
     /* 主循环 */
     int running = 1;
@@ -962,6 +1101,7 @@ int main(void) {
         }
     }
 
+    audit_shutdown();
     inventory_shutdown();
     borrow_shutdown();
     material_shutdown();

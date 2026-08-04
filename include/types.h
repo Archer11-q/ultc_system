@@ -38,6 +38,40 @@
 #define MAX_REASON          128     /**< 报废原因最大长度       */
 
 /* ============================================================
+ * 审计日志操作类型
+ * ============================================================ */
+
+typedef enum {
+    AUDIT_LOGIN        = 0,   /**< 用户登录                       */
+    AUDIT_LOGOUT       = 1,   /**< 用户登出                       */
+    AUDIT_MAT_ADD      = 2,   /**< 新增耗材                       */
+    AUDIT_MAT_EDIT     = 3,   /**< 修改耗材                       */
+    AUDIT_MAT_DELETE   = 4,   /**< 删除耗材                       */
+    AUDIT_MAT_SCRAP    = 5,   /**< 报废耗材                       */
+    AUDIT_BORROW       = 6,   /**< 学生领用                       */
+    AUDIT_RETURN       = 7,   /**< 耗材归还                       */
+    AUDIT_STOCKTAKE    = 8,   /**< 盘点修正                       */
+    AUDIT_ADMIN_ADD    = 9,   /**< 新增管理员                     */
+    AUDIT_ADMIN_DEL    = 10,  /**< 删除管理员                     */
+    AUDIT_ADMIN_CHPWD  = 11,  /**< 修改密码                       */
+    AUDIT_IMPORT       = 12   /**< CSV批量导入                    */
+} AuditAction;
+
+/* ============================================================
+ * 审计日志结构体
+ * ============================================================ */
+
+typedef struct AuditRecord {
+    char        log_id[32];         /**< 日志编号 AUDIT-YYYYMMDD-NNNNNN */
+    time_t      timestamp;          /**< 操作时间                       */
+    char        operator_name[MAX_USERNAME];  /**< 操作者               */
+    int         action;             /**< AuditAction                    */
+    char        target_id[64];      /**< 操作对象（耗材编号/学号/用户名）*/
+    char        detail[256];        /**< 操作详情                       */
+    struct AuditRecord* next;       /**< 链表后继                       */
+} AuditRecord;
+
+/* ============================================================
  * 业务常量
  * ============================================================ */
 

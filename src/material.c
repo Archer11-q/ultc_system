@@ -471,6 +471,29 @@ const char* material_attr_name(int attr) {
 }
 
 /* ============================================================
+ * 全部导出
+ * ============================================================ */
+
+Material* material_get_all(int* out_count) {
+    *out_count = 0;
+    int total = 0;
+    Material* p = g_mat_list;
+    while (p) { total++; p = p->next; }
+    if (total == 0) return NULL;
+
+    Material* arr = (Material*)malloc(sizeof(Material) * total);
+    if (!arr) return NULL;
+    p = g_mat_list;
+    for (int i = 0; i < total; i++) {
+        arr[i] = *p;
+        arr[i].next = NULL;
+        p = p->next;
+    }
+    *out_count = total;
+    return arr;
+}
+
+/* ============================================================
  * 模糊搜索
  * ============================================================ */
 

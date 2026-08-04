@@ -159,6 +159,13 @@ void material_alert_print(void);
  * @param out_count 输出参数，匹配条数
  * @return 匹配的耗材数组（调用方 free），无匹配返回 NULL
  */
+/**
+ * @brief 获取全部耗材（数组形式）
+ * @param out_count 输出参数
+ * @return 耗材数组（调用方 free）
+ */
+Material* material_get_all(int* out_count);
+
 Material* material_search_by_name(const char* keyword, int* out_count);
 
 /**
