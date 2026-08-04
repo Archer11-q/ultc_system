@@ -4,16 +4,16 @@
  * @details 负责登录/菜单分发，具体业务逻辑委托各模块。
  */
 
-#include "types.h"
-#include "platform.h"
+#include "audit.h"
 #include "auth.h"
-#include "material.h"
 #include "borrow.h"
+#include "csv_io.h"
 #include "inventory.h"
+#include "material.h"
+#include "platform.h"
 #include "search.h"
 #include "stats.h"
-#include "audit.h"
-#include "csv_io.h"
+#include "types.h"
 #include "ui.h"
 
 #include <stdio.h>
@@ -30,7 +30,7 @@
 static int input_category(void) {
     printf("\n  分类: 1.电子元器件 2.电工工具 3.开发板 4.化学耗材 5.机械零件\n");
     int c = read_int("  请选择: ", 1, 5);
-    return c - 1;  /* 转为枚举值 0~4 */
+    return c - 1; /* 转为枚举值 0~4 */
 }
 
 /** 输入属性 */
@@ -47,10 +47,10 @@ static time_t input_date(void) {
 
     struct tm tm = {0};
     if (sscanf(buf, "%d-%d-%d", &tm.tm_year, &tm.tm_mon, &tm.tm_mday) != 3) {
-        return time(NULL);  /* 解析失败用当前时间 */
+        return time(NULL); /* 解析失败用当前时间 */
     }
     tm.tm_year -= 1900;
-    tm.tm_mon  -= 1;
+    tm.tm_mon -= 1;
     tm.tm_isdst = -1;
     return mktime(&tm);
 }
@@ -70,10 +70,10 @@ static void menu_material_add(void) {
 
     read_string("  耗材名称: ", mat.name, sizeof(mat.name));
     mat.category = input_category();
-    mat.attr     = input_attr();
-    mat.unit_price  = read_double("  采购单价: ", 0.00, 999999.99);
+    mat.attr = input_attr();
+    mat.unit_price = read_double("  采购单价: ", 0.00, 999999.99);
     mat.total_stock = read_int("  初始库存: ", 0, 999999);
-    mat.min_stock   = read_int("  最低预警库存: ", 0, mat.total_stock);
+    mat.min_stock = read_int("  最低预警库存: ", 0, mat.total_stock);
     read_string("  存放柜号: ", mat.cabinet, sizeof(mat.cabinet));
     mat.purchase_date = input_date();
 
@@ -92,7 +92,7 @@ static void menu_material_edit(void) {
     char id[MAX_MAT_ID];
     read_string("  要修改的耗材编号: ", id, sizeof(id));
 
-    const Material* old = material_find_by_id(id);
+    const Material *old = material_find_by_id(id);
     if (!old) {
         printf("\n  [错误] 耗材 '%s' 不存在。\n", id);
         pause_screen();
@@ -101,11 +101,10 @@ static void menu_material_edit(void) {
 
     /* 显示当前值 */
     printf("\n  当前信息:\n");
-    printf("  名称: %s | 库存: %d | 预警: %d | 柜号: %s | 单价: %.2f\n",
-           old->name, old->total_stock, old->min_stock,
-           old->cabinet, old->unit_price);
+    printf("  名称: %s | 库存: %d | 预警: %d | 柜号: %s | 单价: %.2f\n", old->name,
+           old->total_stock, old->min_stock, old->cabinet, old->unit_price);
 
-    Material mat = *old;  /* 拷贝当前值作为默认 */
+    Material mat = *old; /* 拷贝当前值作为默认 */
 
     printf("\n  （直接回车保留原值，输入 '-' 回车跳过名称）\n\n");
 
@@ -116,7 +115,7 @@ static void menu_material_edit(void) {
     }
 
     mat.total_stock = read_int("  新库存量: ", 0, 999999);
-    mat.min_stock   = read_int("  新预警值: ", 0, mat.total_stock);
+    mat.min_stock = read_int("  新预警值: ", 0, mat.total_stock);
     read_string("  新柜号: ", buf, sizeof(buf));
     if (buf[0] != '\0' && strcmp(buf, "-") != 0) {
         strncpy(mat.cabinet, buf, sizeof(mat.cabinet) - 1);
@@ -138,18 +137,18 @@ static void menu_material_delete(void) {
     char id[MAX_MAT_ID];
     read_string("  要删除的耗材编号: ", id, sizeof(id));
 
-    const Material* mat = material_find_by_id(id);
+    const Material *mat = material_find_by_id(id);
     if (!mat) {
         printf("\n  [错误] 耗材 '%s' 不存在。\n", id);
         pause_screen();
         return;
     }
 
-    printf("\n  名称: %s | 库存: %d | 分类: %s\n",
-           mat->name, mat->total_stock,
+    printf("\n  名称: %s | 库存: %d | 分类: %s\n", mat->name, mat->total_stock,
            material_category_name(mat->category));
 
-    if (!confirm("\n  确认删除该耗材？")) return;
+    if (!confirm("\n  确认删除该耗材？"))
+        return;
 
     int ret = material_delete(id);
     if (ret == 0) {
@@ -180,12 +179,22 @@ static void menu_material_list(void) {
         read_string("  → ", buf, sizeof(buf));
 
         switch (buf[0]) {
-        case 'n': case 'N':
-            if (page < total_pages) { page++; } break;
-        case 'p': case 'P':
-            if (page > 1) { page--; } break;
-        case 'q': case 'Q':
-            running = 0; break;
+        case 'n':
+        case 'N':
+            if (page < total_pages) {
+                page++;
+            }
+            break;
+        case 'p':
+        case 'P':
+            if (page > 1) {
+                page--;
+            }
+            break;
+        case 'q':
+        case 'Q':
+            running = 0;
+            break;
         }
     }
 }
@@ -193,12 +202,12 @@ static void menu_material_list(void) {
 /* ---- 领用归还 ---- */
 
 /** 打印单次领用回执 */
-static void print_receipt(const char* record_id,
-                          const char* student_id, const char* student_name,
-                          const char* class_name, const char* project_id) {
+static void print_receipt(const char *record_id, const char *student_id, const char *student_name,
+                          const char *class_name, const char *project_id) {
     int count = 0;
-    BorrowRecord* items = borrow_get_by_record_id(record_id, &count);
-    if (!items || count == 0) return;
+    BorrowRecord *items = borrow_get_by_record_id(record_id, &count);
+    if (!items || count == 0)
+        return;
 
     double total_value = 0.0;
 
@@ -213,25 +222,22 @@ static void print_receipt(const char* record_id,
     printf("  实训项目 : %s\n", project_id);
 
     char time_buf[32];
-    struct tm* tm = localtime(&items[0].borrow_time);
+    struct tm *tm = localtime(&items[0].borrow_time);
     strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", tm);
     printf("  领用时间 : %s\n", time_buf);
     printf("  操作员   : %s\n", items[0].operator_name);
     print_line();
-    printf("  %-4s %-16s %-20s %-8s %s\n",
-           "序号", "耗材编号", "耗材名称", "数量", "类型");
+    printf("  %-4s %-16s %-20s %-8s %s\n", "序号", "耗材编号", "耗材名称", "数量", "类型");
     print_line();
 
     for (int i = 0; i < count; i++) {
-        const Material* mat = material_find_by_id(items[i].material_id);
-        const char* mat_name = mat ? mat->name : "（已删除）";
-        const char* type = (mat && mat->attr == ATTR_DISPOSABLE)
-                               ? "一次性" : "可循环";
+        const Material *mat = material_find_by_id(items[i].material_id);
+        const char *mat_name = mat ? mat->name : "（已删除）";
+        const char *type = (mat && mat->attr == ATTR_DISPOSABLE) ? "一次性" : "可循环";
         double item_val = mat ? (mat->unit_price * items[i].quantity) : 0.0;
         total_value += item_val;
 
-        printf("  %-4d %-16s %-20s %-8d %s\n",
-               i + 1, items[i].material_id, mat_name,
+        printf("  %-4d %-16s %-20s %-8d %s\n", i + 1, items[i].material_id, mat_name,
                items[i].quantity, type);
     }
     print_line();
@@ -258,10 +264,10 @@ static void menu_borrow_new(void) {
     char project_id[MAX_PROJECT_ID];
 
     printf("\n  ── 学生信息 ──\n");
-    read_string("  学号: ",        student_id,   sizeof(student_id));
-    read_string("  姓名: ",        student_name, sizeof(student_name));
-    read_string("  班级: ",        class_name,   sizeof(class_name));
-    read_string("  实训项目编号: ", project_id,   sizeof(project_id));
+    read_string("  学号: ", student_id, sizeof(student_id));
+    read_string("  姓名: ", student_name, sizeof(student_name));
+    read_string("  班级: ", class_name, sizeof(class_name));
+    read_string("  实训项目编号: ", project_id, sizeof(project_id));
 
     /* 2. 生成领用单号 */
     char record_id[MAX_RECORD_ID];
@@ -283,18 +289,18 @@ static void menu_borrow_new(void) {
         printf("  0. 取消领用\n");
 
         int choice = read_int("\n  请选择: ", 0, 2);
-        if (choice == 0 || choice == 2) { running = 0; }
+        if (choice == 0 || choice == 2) {
+            running = 0;
+        }
         if (choice == 0) {
             /* 取消：归还已扣减的库存（一次性耗材） */
             int cnt = 0;
-            BorrowRecord* items = borrow_get_by_record_id(record_id, &cnt);
+            BorrowRecord *items = borrow_get_by_record_id(record_id, &cnt);
             if (items) {
                 for (int i = 0; i < cnt; i++) {
-                    const Material* mat = material_find_by_id(
-                        items[i].material_id);
+                    const Material *mat = material_find_by_id(items[i].material_id);
                     if (mat && mat->attr == ATTR_DISPOSABLE) {
-                        material_increase_stock(items[i].material_id,
-                                                items[i].quantity);
+                        material_increase_stock(items[i].material_id, items[i].quantity);
                     }
                 }
                 free(items);
@@ -303,25 +309,26 @@ static void menu_borrow_new(void) {
             pause_screen();
             return;
         }
-        if (choice == 2) break;
+        if (choice == 2)
+            break;
 
         /* 选择耗材 */
-        if (choice != 1) continue;
+        if (choice != 1)
+            continue;
 
         char mat_id[MAX_MAT_ID];
         int quantity;
         read_string("\n  耗材编号: ", mat_id, sizeof(mat_id));
 
-        const Material* mat = material_find_by_id(mat_id);
+        const Material *mat = material_find_by_id(mat_id);
         if (!mat) {
             printf("  [错误] 耗材 '%s' 不存在。\n", mat_id);
             pause_screen();
             continue;
         }
 
-        printf("  耗材: %s | 分类: %s | 属性: %s | 库存: %d | 单价: %.2f\n",
-               mat->name, material_category_name(mat->category),
-               material_attr_name(mat->attr),
+        printf("  耗材: %s | 分类: %s | 属性: %s | 库存: %d | 单价: %.2f\n", mat->name,
+               material_category_name(mat->category), material_attr_name(mat->attr),
                mat->total_stock, mat->unit_price);
 
         quantity = read_int("  领用数量: ", 1, 99999);
@@ -331,8 +338,7 @@ static void menu_borrow_new(void) {
             /* 一次性耗材：库存充足才可领用 */
             if (mat->total_stock < quantity) {
                 set_color_red();
-                printf("  [错误] 库存不足！当前库存 %d，需要 %d。\n",
-                       mat->total_stock, quantity);
+                printf("  [错误] 库存不足！当前库存 %d，需要 %d。\n", mat->total_stock, quantity);
                 reset_color();
                 pause_screen();
                 continue;
@@ -345,17 +351,16 @@ static void menu_borrow_new(void) {
         /* 创建领用记录 */
         BorrowRecord rec;
         memset(&rec, 0, sizeof(rec));
-        strncpy(rec.record_id,    record_id,    sizeof(rec.record_id) - 1);
-        strncpy(rec.student_id,   student_id,   sizeof(rec.student_id) - 1);
+        strncpy(rec.record_id, record_id, sizeof(rec.record_id) - 1);
+        strncpy(rec.student_id, student_id, sizeof(rec.student_id) - 1);
         strncpy(rec.student_name, student_name, sizeof(rec.student_name) - 1);
-        strncpy(rec.class_name,   class_name,   sizeof(rec.class_name) - 1);
-        strncpy(rec.project_id,   project_id,   sizeof(rec.project_id) - 1);
-        strncpy(rec.material_id,  mat_id,       sizeof(rec.material_id) - 1);
-        rec.quantity    = quantity;
+        strncpy(rec.class_name, class_name, sizeof(rec.class_name) - 1);
+        strncpy(rec.project_id, project_id, sizeof(rec.project_id) - 1);
+        strncpy(rec.material_id, mat_id, sizeof(rec.material_id) - 1);
+        rec.quantity = quantity;
         rec.borrow_time = time(NULL);
-        rec.status      = BORROW_ACTIVE;
-        strncpy(rec.operator_name, auth_current_user(),
-                sizeof(rec.operator_name) - 1);
+        rec.status = BORROW_ACTIVE;
+        strncpy(rec.operator_name, auth_current_user(), sizeof(rec.operator_name) - 1);
 
         borrow_create(&rec);
         item_count++;
@@ -374,8 +379,7 @@ static void menu_borrow_new(void) {
 
     /* 4. 打印回执 */
     print_title("领用回执");
-    print_receipt(record_id, student_id, student_name,
-                  class_name, project_id);
+    print_receipt(record_id, student_id, student_name, class_name, project_id);
     pause_screen();
 }
 
@@ -388,7 +392,7 @@ static void menu_borrow_return(void) {
 
     /* 列出该学生所有未归还记录 */
     int count = 0;
-    BorrowRecord* items = borrow_get_unreturned_by_student(student_id, &count);
+    BorrowRecord *items = borrow_get_unreturned_by_student(student_id, &count);
     if (!items || count == 0) {
         printf("\n  [提示] 该学生没有未归还的耗材。\n");
         pause_screen();
@@ -397,23 +401,21 @@ static void menu_borrow_return(void) {
 
     printf("\n  该学生有 %d 条未归还记录:\n", count);
     print_line();
-    printf("  %-3s %-22s %-12s %-12s %-6s %s\n",
-           "序号", "领用单号", "耗材编号", "耗材名称", "数量", "属性");
+    printf("  %-3s %-22s %-12s %-12s %-6s %s\n", "序号", "领用单号", "耗材编号", "耗材名称", "数量",
+           "属性");
     print_line();
 
     for (int i = 0; i < count; i++) {
-        const Material* mat = material_find_by_id(items[i].material_id);
-        const char* mat_name = mat ? mat->name : "（已删除）";
-        const char* attr_str = (mat && mat->attr == ATTR_REUSABLE)
-                                   ? "可循环" : "一次性";
+        const Material *mat = material_find_by_id(items[i].material_id);
+        const char *mat_name = mat ? mat->name : "（已删除）";
+        const char *attr_str = (mat && mat->attr == ATTR_REUSABLE) ? "可循环" : "一次性";
 
         /* 检查是否逾期 */
         double days = difftime(time(NULL), items[i].borrow_time) / 86400.0;
-        const char* overdue_mark = (days > OVERDUE_DAYS) ? " ★逾期" : "";
+        const char *overdue_mark = (days > OVERDUE_DAYS) ? " ★逾期" : "";
 
-        printf("  %-3d %-22s %-12s %-12s %-6d %s%s\n",
-               i + 1, items[i].record_id, items[i].material_id,
-               mat_name, items[i].quantity, attr_str, overdue_mark);
+        printf("  %-3d %-22s %-12s %-12s %-6d %s%s\n", i + 1, items[i].record_id,
+               items[i].material_id, mat_name, items[i].quantity, attr_str, overdue_mark);
     }
     print_line();
 
@@ -430,7 +432,7 @@ static void menu_borrow_return(void) {
     for (int i = 0; i < count; i++) {
         if (strcmp(items[i].record_id, record_id) == 0) {
             valid = 1;
-            const Material* mat = material_find_by_id(items[i].material_id);
+            const Material *mat = material_find_by_id(items[i].material_id);
             if (mat && mat->attr == ATTR_REUSABLE) {
                 is_reusable = 1;
                 quantity = items[i].quantity;
@@ -465,8 +467,7 @@ static void menu_borrow_return(void) {
 
         /* 损坏 → 报废：扣库存 + 写报废记录 */
         if (mat_id[0] != '\0') {
-            material_scrap(mat_id, quantity, damage_note,
-                           auth_current_user());
+            material_scrap(mat_id, quantity, damage_note, auth_current_user());
         }
         borrow_return_session(record_id, damage_note);
         set_color_yellow();
@@ -488,7 +489,7 @@ static void menu_borrow_overdue(void) {
 
     /* 先自动刷新逾期状态：将超 7 天且状态为 ACTIVE 的记录标记为 OVERDUE */
     int overdue_count = 0;
-    BorrowRecord* overdue = borrow_get_overdue_list(&overdue_count);
+    BorrowRecord *overdue = borrow_get_overdue_list(&overdue_count);
 
     if (!overdue || overdue_count == 0) {
         printf("\n  [提示] 当前没有逾期未归还的记录。\n");
@@ -503,8 +504,7 @@ static void menu_borrow_overdue(void) {
 
     /* 统计逾期学生 */
     printf("\n  ── 逾期学生名单 ──\n");
-    printf("  %-4s %-12s %-14s %-22s %s\n",
-           "序号", "学号", "姓名", "领用单号", "逾期天数");
+    printf("  %-4s %-12s %-14s %-22s %s\n", "序号", "学号", "姓名", "领用单号", "逾期天数");
     print_line();
 
     /* 去重显示：按 (学号, 单号) 组合 */
@@ -519,15 +519,12 @@ static void menu_borrow_overdue(void) {
                 break;
             }
         }
-        if (dup) continue;
+        if (dup)
+            continue;
 
         double days = difftime(time(NULL), overdue[i].borrow_time) / 86400.0;
-        printf("  %-4d %-12s %-14s %-22s %.0f 天\n",
-               ++shown,
-               overdue[i].student_id,
-               overdue[i].student_name,
-               overdue[i].record_id,
-               days);
+        printf("  %-4d %-12s %-14s %-22s %.0f 天\n", ++shown, overdue[i].student_id,
+               overdue[i].student_name, overdue[i].record_id, days);
     }
     print_line();
     printf("  共 %d 名学生存在逾期\n\n", shown);
@@ -535,7 +532,7 @@ static void menu_borrow_overdue(void) {
     /* 统计可循环工具逾期数量 */
     int tool_overdue = 0;
     for (int i = 0; i < overdue_count; i++) {
-        const Material* mat = material_find_by_id(overdue[i].material_id);
+        const Material *mat = material_find_by_id(overdue[i].material_id);
         if (mat && mat->attr == ATTR_REUSABLE) {
             tool_overdue += overdue[i].quantity;
         }
@@ -580,7 +577,8 @@ static void menu_inventory_stocktake(void) {
     material_list_page(1, &total_pages);
 
     printf("\n  ── 盘点操作 ──\n");
-    if (!confirm("\n  是否开始逐项盘点？")) return;
+    if (!confirm("\n  是否开始逐项盘点？"))
+        return;
 
     /* 逐项盘点：需要遍历所有耗材。
      * 因为 material 模块不提供 get_all 迭代器，
@@ -601,14 +599,13 @@ static void menu_inventory_stocktake(void) {
             break;
         }
 
-        const Material* mat = material_find_by_id(mat_id);
+        const Material *mat = material_find_by_id(mat_id);
         if (!mat) {
             printf("  [错误] 耗材 '%s' 不存在。\n", mat_id);
             continue;
         }
 
-        printf("  耗材: %s | 账面库存: %d | 分类: %s\n",
-               mat->name, mat->total_stock,
+        printf("  耗材: %s | 账面库存: %d | 分类: %s\n", mat->name, mat->total_stock,
                material_category_name(mat->category));
 
         int actual = read_int("  实际库存: ", 0, 999999);
@@ -616,8 +613,7 @@ static void menu_inventory_stocktake(void) {
         int auto_correct = 0;
         if (actual != mat->total_stock) {
             set_color_yellow();
-            printf("  差异: %+d（账面 %d → 实际 %d）\n",
-                   actual - mat->total_stock,
+            printf("  差异: %+d（账面 %d → 实际 %d）\n", actual - mat->total_stock,
                    mat->total_stock, actual);
             reset_color();
 
@@ -629,9 +625,7 @@ static void menu_inventory_stocktake(void) {
             printf("  库存一致，无需修正。\n");
         }
 
-        int diff = inventory_stocktake_item(mat_id, actual,
-                                             auth_current_user(),
-                                             auto_correct);
+        int diff = inventory_stocktake_item(mat_id, actual, auth_current_user(), auto_correct);
         if (diff != -999999) {
             checked++;
             if (auto_correct) {
@@ -642,8 +636,7 @@ static void menu_inventory_stocktake(void) {
         }
     }
 
-    printf("\n  [提示] 盘点完成。共盘点 %d 种耗材，修正 %d 项差异。\n",
-           checked, corrected);
+    printf("\n  [提示] 盘点完成。共盘点 %d 种耗材，修正 %d 项差异。\n", checked, corrected);
 
     /* 显示盘点日志 */
     if (checked > 0 && confirm("\n  是否查看本次盘点日志？")) {
@@ -656,10 +649,10 @@ static void menu_inventory_stocktake(void) {
 
 /* ---- 检索 ---- */
 static void menu_search_material(void) { search_material_menu(); }
-static void menu_search_record(void)   { search_record_menu(); }
+static void menu_search_record(void) { search_record_menu(); }
 
 /* ---- 统计 ---- */
-static void menu_stats(void)           { stats_menu(); }
+static void menu_stats(void) { stats_menu(); }
 
 /* ---- CSV 导入导出 ---- */
 
@@ -687,7 +680,10 @@ static void menu_csv_export(void) {
         printf("  0. 返回\n");
 
         int choice = read_int("\n  请选择: ", 0, 3);
-        if (choice == 0) { running = 0; continue; }
+        if (choice == 0) {
+            running = 0;
+            continue;
+        }
 
         char path[256];
         char default_name[64];
@@ -697,29 +693,33 @@ static void menu_csv_export(void) {
 
         switch (choice) {
         case 1:
-            snprintf(default_name, sizeof(default_name),
-                     "materials_%s.csv", date);
+            snprintf(default_name, sizeof(default_name), "materials_%s.csv", date);
             printf("  导出文件（回车= %s）: ", default_name);
             break;
         case 2:
-            snprintf(default_name, sizeof(default_name),
-                     "purchase_%s.csv", date);
+            snprintf(default_name, sizeof(default_name), "purchase_%s.csv", date);
             printf("  导出文件（回车= %s）: ", default_name);
             break;
         case 3:
-            snprintf(default_name, sizeof(default_name),
-                     "borrows_%s.csv", date);
+            snprintf(default_name, sizeof(default_name), "borrows_%s.csv", date);
             printf("  导出文件（回车= %s）: ", default_name);
             break;
         }
 
         read_string("", path, sizeof(path));
-        if (path[0] == '\0') strncpy(path, default_name, sizeof(path)-1);
+        if (path[0] == '\0')
+            strncpy(path, default_name, sizeof(path) - 1);
 
         switch (choice) {
-        case 1: csv_export_materials(path);      break;
-        case 2: csv_export_purchase_list(path);  break;
-        case 3: csv_export_borrow_records(path); break;
+        case 1:
+            csv_export_materials(path);
+            break;
+        case 2:
+            csv_export_purchase_list(path);
+            break;
+        case 3:
+            csv_export_borrow_records(path);
+            break;
         }
         pause_screen();
     }
@@ -747,11 +747,20 @@ static void menu_audit_view(void) {
         read_string("", buf, sizeof(buf));
 
         switch (buf[0]) {
-        case 'n': case 'N':
-            if (page < total_pages) { page++; } break;
-        case 'p': case 'P':
-            if (page > 1) { page--; } break;
-        case 'f': case 'F': {
+        case 'n':
+        case 'N':
+            if (page < total_pages) {
+                page++;
+            }
+            break;
+        case 'p':
+        case 'P':
+            if (page > 1) {
+                page--;
+            }
+            break;
+        case 'f':
+        case 'F': {
             printf("\n  操作类型（-1=全部, 2=新增耗材, 6=领用, 7=归还...）: ");
             filter_action = read_int("", -1, 12);
             printf("  操作者（回车=全部）: ");
@@ -759,7 +768,8 @@ static void menu_audit_view(void) {
             page = 1;
             break;
         }
-        case 'r': case 'R':
+        case 'r':
+        case 'R':
             filter_action = -1;
             filter_user[0] = '\0';
             page = 1;
@@ -787,10 +797,8 @@ static void do_login(void) {
 
     switch (result) {
     case AUTH_OK: {
-        const char* role_name = (auth_current_role() == ROLE_ADMIN)
-                                    ? "管理员" : "助教";
-        printf("\n  [提示] 登录成功！欢迎 %s（%s）\n",
-               auth_current_user(), role_name);
+        const char *role_name = (auth_current_role() == ROLE_ADMIN) ? "管理员" : "助教";
+        printf("\n  [提示] 登录成功！欢迎 %s（%s）\n", auth_current_user(), role_name);
         pause_screen();
         break;
     }
@@ -803,8 +811,8 @@ static void do_login(void) {
         int remaining = auth_lock_remaining(username);
         if (remaining > 0) {
             set_color_red();
-            printf("\n  [错误] 密码连续错误 %d 次，账号已锁定 %d 秒。\n",
-                   MAX_LOGIN_ATTEMPTS, remaining);
+            printf("\n  [错误] 密码连续错误 %d 次，账号已锁定 %d 秒。\n", MAX_LOGIN_ATTEMPTS,
+                   remaining);
             reset_color();
         } else {
             printf("\n  [错误] 密码错误。\n");
@@ -923,10 +931,18 @@ static void menu_admin_manage(void) {
         int choice = read_int("\n  请选择: ", 0, 3);
 
         switch (choice) {
-        case 0: running = 0; break;
-        case 1: menu_admin_manage_add();    break;
-        case 2: menu_admin_manage_delete(); break;
-        case 3: menu_admin_manage_chpwd();  break;
+        case 0:
+            running = 0;
+            break;
+        case 1:
+            menu_admin_manage_add();
+            break;
+        case 2:
+            menu_admin_manage_delete();
+            break;
+        case 3:
+            menu_admin_manage_chpwd();
+            break;
         }
     }
 }
@@ -961,24 +977,61 @@ static void menu_admin(void) {
         int choice = read_int("\n  请选择: ", 0, 17);
 
         switch (choice) {
-        case 0:  running = 0; do_logout(); break;
-        case 1:  menu_material_add();    break;
-        case 2:  menu_material_edit();   break;
-        case 3:  menu_material_delete(); break;
-        case 4:  menu_material_list();   break;
-        case 5:  menu_borrow_new();      break;
-        case 6:  menu_borrow_return();   break;
-        case 7:  menu_borrow_overdue();  break;
-        case 8:  menu_inventory_alert();   break;
-        case 9:  menu_inventory_stocktake(); break;
-        case 10: menu_search_material(); break;
-        case 11: menu_search_record();   break;
-        case 12: menu_stats();           break;
-        case 13: menu_admin_manage();    break;
-        case 14: menu_csv_import();      break;
-        case 15: menu_csv_export();      break;
-        case 16: menu_audit_view();      break;
-        case 17: do_logout();            break;
+        case 0:
+            running = 0;
+            do_logout();
+            break;
+        case 1:
+            menu_material_add();
+            break;
+        case 2:
+            menu_material_edit();
+            break;
+        case 3:
+            menu_material_delete();
+            break;
+        case 4:
+            menu_material_list();
+            break;
+        case 5:
+            menu_borrow_new();
+            break;
+        case 6:
+            menu_borrow_return();
+            break;
+        case 7:
+            menu_borrow_overdue();
+            break;
+        case 8:
+            menu_inventory_alert();
+            break;
+        case 9:
+            menu_inventory_stocktake();
+            break;
+        case 10:
+            menu_search_material();
+            break;
+        case 11:
+            menu_search_record();
+            break;
+        case 12:
+            menu_stats();
+            break;
+        case 13:
+            menu_admin_manage();
+            break;
+        case 14:
+            menu_csv_import();
+            break;
+        case 15:
+            menu_csv_export();
+            break;
+        case 16:
+            menu_audit_view();
+            break;
+        case 17:
+            do_logout();
+            break;
         }
     }
 }
@@ -1004,13 +1057,28 @@ static void menu_ta(void) {
         int choice = read_int("\n  请选择: ", 0, 6);
 
         switch (choice) {
-        case 0: running = 0; do_logout(); break;
-        case 1: menu_material_list();       break;
-        case 2: menu_inventory_alert();     break;
-        case 3: menu_search_material();     break;
-        case 4: menu_search_record();       break;
-        case 5: menu_stats();               break;
-        case 6: do_logout();                break;
+        case 0:
+            running = 0;
+            do_logout();
+            break;
+        case 1:
+            menu_material_list();
+            break;
+        case 2:
+            menu_inventory_alert();
+            break;
+        case 3:
+            menu_search_material();
+            break;
+        case 4:
+            menu_search_record();
+            break;
+        case 5:
+            menu_stats();
+            break;
+        case 6:
+            do_logout();
+            break;
         }
     }
 }
@@ -1077,8 +1145,12 @@ int main(void) {
 
             int choice = read_int("\n  请选择: ", 0, 1);
             switch (choice) {
-            case 1: do_login(); break;
-            case 0: running = 0; break;
+            case 1:
+                do_login();
+                break;
+            case 0:
+                running = 0;
+                break;
             }
         } else if (auth_current_role() == ROLE_ADMIN) {
             menu_admin();

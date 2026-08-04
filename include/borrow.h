@@ -33,7 +33,7 @@ void borrow_shutdown(void);
  * @param buf   输出缓冲区
  * @param bufsz 缓冲区大小
  */
-void borrow_gen_id(char* buf, size_t bufsz);
+void borrow_gen_id(char *buf, size_t bufsz);
 
 /**
  * @brief 创建一条领用记录
@@ -43,7 +43,7 @@ void borrow_gen_id(char* buf, size_t bufsz);
  *            borrow_time、operator_name 需填写，next 忽略）
  * @return 0 成功，-1 失败
  */
-int borrow_create(const BorrowRecord* rec);
+int borrow_create(const BorrowRecord *rec);
 
 /**
  * @brief 按领用单号获取所有记录
@@ -51,7 +51,7 @@ int borrow_create(const BorrowRecord* rec);
  * @param out_count 输出参数，记录条数
  * @return 记录数组（调用方 free），无记录返回 NULL
  */
-BorrowRecord* borrow_get_by_record_id(const char* record_id, int* out_count);
+BorrowRecord *borrow_get_by_record_id(const char *record_id, int *out_count);
 
 /* ============================================================
  * 归还操作（v0.5 完整实现，v0.4 提供接口占位）
@@ -63,8 +63,7 @@ BorrowRecord* borrow_get_by_record_id(const char* record_id, int* out_count);
  * @param out_count  输出参数，记录条数
  * @return 记录数组（调用方 free），无记录返回 NULL
  */
-BorrowRecord* borrow_get_unreturned_by_student(const char* student_id,
-                                                int* out_count);
+BorrowRecord *borrow_get_unreturned_by_student(const char *student_id, int *out_count);
 
 /**
  * @brief 执行归还
@@ -72,7 +71,7 @@ BorrowRecord* borrow_get_unreturned_by_student(const char* student_id,
  * @param damage_note 损坏说明（无损坏传 ""）
  * @return 0 成功，-1 记录不存在，-2 已归还
  */
-int borrow_return(const char* record_id, const char* damage_note);
+int borrow_return(const char *record_id, const char *damage_note);
 
 /**
  * @brief 归还指定领用单号下的所有未归还记录（批量归还）
@@ -82,14 +81,14 @@ int borrow_return(const char* record_id, const char* damage_note);
  * @param damage_note 损坏说明（所有项共用，传 "" 表示正常归还）
  * @return 归还的条数，0 表示无未归还记录，-1 表示单号不存在
  */
-int borrow_return_session(const char* record_id, const char* damage_note);
+int borrow_return_session(const char *record_id, const char *damage_note);
 
 /**
  * @brief 获取逾期未归还的记录
  * @param out_count 输出参数
  * @return 记录数组（调用方 free）
  */
-BorrowRecord* borrow_get_overdue_list(int* out_count);
+BorrowRecord *borrow_get_overdue_list(int *out_count);
 
 /* ============================================================
  * 查询
@@ -103,8 +102,8 @@ BorrowRecord* borrow_get_overdue_list(int* out_count);
  * @param out_count    输出参数
  * @return 匹配的记录数组（调用方 free）
  */
-BorrowRecord* borrow_search(const char* class_name, const char* student_id,
-                             const char* project_id, int* out_count);
+BorrowRecord *borrow_search(const char *class_name, const char *student_id, const char *project_id,
+                            int *out_count);
 
 /**
  * @brief 获取领用记录总数
@@ -116,7 +115,7 @@ int borrow_count(void);
  * @param page        页码
  * @param total_pages 输出参数
  */
-void borrow_list_page(int page, int* total_pages);
+void borrow_list_page(int page, int *total_pages);
 
 #ifdef __cplusplus
 }

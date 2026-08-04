@@ -23,10 +23,10 @@ void print_separator(void);
 void print_line(void);
 
 /** 打印居中标题（带分隔线包围） */
-void print_title(const char* title);
+void print_title(const char *title);
 
 /** 打印子标题（无清屏） */
-void print_subtitle(const char* subtitle);
+void print_subtitle(const char *subtitle);
 
 /* ============================================================
  * 格式化输入
@@ -39,7 +39,7 @@ void print_subtitle(const char* subtitle);
  * @param max    最大值（含）
  * @return 用户输入的有效整数
  */
-int read_int(const char* prompt, int min, int max);
+int read_int(const char *prompt, int min, int max);
 
 /**
  * @brief 读取浮点数
@@ -48,7 +48,7 @@ int read_int(const char* prompt, int min, int max);
  * @param max    最大值（含）
  * @return 用户输入的有效浮点数
  */
-double read_double(const char* prompt, double min, double max);
+double read_double(const char *prompt, double min, double max);
 
 /**
  * @brief 读取字符串（去除尾部换行）
@@ -56,14 +56,14 @@ double read_double(const char* prompt, double min, double max);
  * @param buf    输出缓冲区
  * @param maxlen 缓冲区长度
  */
-void read_string(const char* prompt, char* buf, int maxlen);
+void read_string(const char *prompt, char *buf, int maxlen);
 
 /**
  * @brief 确认操作（Y/N）
  * @param prompt 确认提示
  * @return 1=确认, 0=取消
  */
-int confirm(const char* prompt);
+int confirm(const char *prompt);
 
 #ifdef __cplusplus
 }

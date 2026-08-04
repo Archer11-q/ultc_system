@@ -27,17 +27,13 @@ extern "C" {
 /**
  * @brief 16 位整数转大端序
  */
-static inline uint16_t host_to_be16(uint16_t v) {
-    return (uint16_t)((v >> 8) | (v << 8));
-}
+static inline uint16_t host_to_be16(uint16_t v) { return (uint16_t)((v >> 8) | (v << 8)); }
 
 /**
  * @brief 32 位整数转大端序
  */
 static inline uint32_t host_to_be32(uint32_t v) {
-    return ((v >> 24) & 0x000000FFu) |
-           ((v >>  8) & 0x0000FF00u) |
-           ((v <<  8) & 0x00FF0000u) |
+    return ((v >> 24) & 0x000000FFu) | ((v >> 8) & 0x0000FF00u) | ((v << 8) & 0x00FF0000u) |
            ((v << 24) & 0xFF000000u);
 }
 
@@ -78,7 +74,7 @@ static inline void pause_screen(void) {
  * @param maxlen 缓冲区最大长度（含终止符）
  * @return 成功返回读入字符数，Ctrl+C 中断返回 -1
  */
-int get_password(char* buf, int maxlen);
+int get_password(char *buf, int maxlen);
 
 /* ============================================================
  * 控制台颜色输出（跨平台实现见 platform.c）

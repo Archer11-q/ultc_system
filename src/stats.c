@@ -6,11 +6,11 @@
  */
 
 #include "stats.h"
-#include "material.h"
 #include "borrow.h"
+#include "material.h"
 #include "platform.h"
-#include "ui.h"
 #include "types.h"
+#include "ui.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,7 +24,7 @@
 static void stats_monthly(void) {
     /* 获取全部领用记录 */
     int total = 0;
-    BorrowRecord* all = borrow_search("", "", "", &total);
+    BorrowRecord *all = borrow_search("", "", "", &total);
     if (!all || total == 0) {
         printf("\n  [提示] 暂无领用记录。\n");
         return;
@@ -33,22 +33,23 @@ static void stats_monthly(void) {
     /* 按月份+分类聚合：
      * 用简单结构：month_key (YYYYMM) → category → {count, cost} */
     typedef struct {
-        int  year_month;   /* 如 202608 */
-        int  category;
-        int  count;
+        int year_month; /* 如 202608 */
+        int category;
+        int count;
         double cost;
     } MonthStat;
 
-    MonthStat stats[200];  /* 预分配：最多 200 个 (月×类) 组合 */
+    MonthStat stats[200]; /* 预分配：最多 200 个 (月×类) 组合 */
     int stat_count = 0;
 
     for (int i = 0; i < total; i++) {
-        struct tm* tm = localtime(&all[i].borrow_time);
+        struct tm *tm = localtime(&all[i].borrow_time);
         int ym = (tm->tm_year + 1900) * 100 + (tm->tm_mon + 1);
 
-        const Material* mat = material_find_by_id(all[i].material_id);
+        const Material *mat = material_find_by_id(all[i].material_id);
         int cat = mat ? mat->category : -1;
-        if (cat < 0) continue;
+        if (cat < 0)
+            continue;
 
         double price = mat ? mat->unit_price : 0.0;
 
@@ -66,9 +67,9 @@ static void stats_monthly(void) {
             stats[found].cost += price * all[i].quantity;
         } else if (stat_count < 200) {
             stats[stat_count].year_month = ym;
-            stats[stat_count].category   = cat;
-            stats[stat_count].count      = 1;
-            stats[stat_count].cost       = price * all[i].quantity;
+            stats[stat_count].category = cat;
+            stats[stat_count].count = 1;
+            stats[stat_count].cost = price * all[i].quantity;
             stat_count++;
         }
     }
@@ -90,11 +91,8 @@ static void stats_monthly(void) {
     for (int i = 0; i < stat_count; i++) {
         int y = stats[i].year_month / 100;
         int m = stats[i].year_month % 100;
-        printf("  %04d-%02d  %-12s %8d %12.2f\n",
-               y, m,
-               material_category_name(stats[i].category),
-               stats[i].count,
-               stats[i].cost);
+        printf("  %04d-%02d  %-12s %8d %12.2f\n", y, m, material_category_name(stats[i].category),
+               stats[i].count, stats[i].cost);
         grand_total += stats[i].cost;
     }
     print_line();
@@ -108,7 +106,7 @@ static void stats_monthly(void) {
 
 static void stats_class_ranking(void) {
     int total = 0;
-    BorrowRecord* all = borrow_search("", "", "", &total);
+    BorrowRecord *all = borrow_search("", "", "", &total);
     if (!all || total == 0) {
         printf("\n  [提示] 暂无领用记录。\n");
         return;
@@ -117,7 +115,7 @@ static void stats_class_ranking(void) {
     /* 按班级聚合 */
     typedef struct {
         char class_name[MAX_CLASS_NAME];
-        int  total_qty;
+        int total_qty;
     } ClassStat;
 
     ClassStat stats[100];
@@ -169,13 +167,15 @@ static void stats_class_ranking(void) {
 
     for (int i = 0; i < stat_count; i++) {
         /* 前三名特殊标记 */
-        const char* mark = "";
-        if (i == 0) mark = "  ★ 冠军";
-        else if (i == 1) mark = "  ▲ 亚军";
-        else if (i == 2) mark = "  ◆ 季军";
+        const char *mark = "";
+        if (i == 0)
+            mark = "  ★ 冠军";
+        else if (i == 1)
+            mark = "  ▲ 亚军";
+        else if (i == 2)
+            mark = "  ◆ 季军";
 
-        printf("  %-4d %-20s %d%s\n",
-               i + 1, stats[i].class_name, stats[i].total_qty, mark);
+        printf("  %-4d %-20s %d%s\n", i + 1, stats[i].class_name, stats[i].total_qty, mark);
     }
     print_line();
     printf("  共 %d 个班级\n", stat_count);
@@ -188,7 +188,7 @@ static void stats_class_ranking(void) {
 
 static void stats_overdue(void) {
     int count = 0;
-    BorrowRecord* overdue = borrow_get_overdue_list(&count);
+    BorrowRecord *overdue = borrow_get_overdue_list(&count);
 
     if (!overdue || count == 0) {
         printf("\n  [提示] 当前没有逾期记录。\n");
@@ -207,7 +207,7 @@ static void stats_overdue(void) {
 
     for (int i = 0; i < count; i++) {
         /* 统计工具数量 */
-        const Material* mat = material_find_by_id(overdue[i].material_id);
+        const Material *mat = material_find_by_id(overdue[i].material_id);
         if (mat && mat->attr == ATTR_REUSABLE) {
             tool_total += overdue[i].quantity;
         }
@@ -221,11 +221,9 @@ static void stats_overdue(void) {
             }
         }
         if (!dup && student_count < 100) {
-            strncpy(students[student_count].student_id,
-                    overdue[i].student_id,
+            strncpy(students[student_count].student_id, overdue[i].student_id,
                     sizeof(students[student_count].student_id) - 1);
-            strncpy(students[student_count].student_name,
-                    overdue[i].student_name,
+            strncpy(students[student_count].student_name, overdue[i].student_name,
                     sizeof(students[student_count].student_name) - 1);
             student_count++;
         }
@@ -255,7 +253,7 @@ static void stats_overdue(void) {
 
 static void stats_scrap_cost(void) {
     int count = 0;
-    ScrapRecord* scraps = material_scrap_get_all(&count);
+    ScrapRecord *scraps = material_scrap_get_all(&count);
 
     if (!scraps || count == 0) {
         printf("\n  [提示] 暂无报废记录。\n");
@@ -264,29 +262,29 @@ static void stats_scrap_cost(void) {
 
     /* 按分类聚合 */
     typedef struct {
-        int   category;
-        int   total_qty;
+        int category;
+        int total_qty;
         double total_cost;
     } ScrapStat;
 
-    ScrapStat stats[5] = {0};  /* 5 种分类 */
+    ScrapStat stats[5] = {0}; /* 5 种分类 */
     double grand_cost = 0.0;
-    int    grand_qty  = 0;
+    int grand_qty = 0;
 
     for (int i = 0; i < count; i++) {
         int cat = -1;
         double price = 0.0;
-        const Material* mat = material_find_by_id(scraps[i].material_id);
+        const Material *mat = material_find_by_id(scraps[i].material_id);
         if (mat) {
             cat = mat->category;
             price = mat->unit_price;
         } else {
-            cat = 0;  /* 未知归入电子元器件 */
+            cat = 0; /* 未知归入电子元器件 */
         }
 
-        stats[cat].total_qty  += scraps[i].quantity;
+        stats[cat].total_qty += scraps[i].quantity;
         stats[cat].total_cost += price * scraps[i].quantity;
-        grand_qty  += scraps[i].quantity;
+        grand_qty += scraps[i].quantity;
         grand_cost += price * scraps[i].quantity;
     }
 
@@ -299,9 +297,8 @@ static void stats_scrap_cost(void) {
 
     for (int i = 0; i < 5; i++) {
         if (stats[i].total_qty > 0) {
-            printf("  %-12s %8d %12.2f\n",
-                   material_category_name(i),
-                   stats[i].total_qty, stats[i].total_cost);
+            printf("  %-12s %8d %12.2f\n", material_category_name(i), stats[i].total_qty,
+                   stats[i].total_cost);
         }
     }
     print_line();
@@ -330,11 +327,25 @@ void stats_menu(void) {
         int choice = read_int("\n  请选择: ", 0, 5);
 
         switch (choice) {
-        case 0: running = 0; break;
-        case 1: print_title("月度耗材消耗统计"); stats_monthly(); break;
-        case 2: print_title("班级耗材用量排行榜"); stats_class_ranking(); break;
-        case 3: print_title("逾期未归还统计"); stats_overdue(); break;
-        case 4: print_title("报废耗材成本统计"); stats_scrap_cost(); break;
+        case 0:
+            running = 0;
+            break;
+        case 1:
+            print_title("月度耗材消耗统计");
+            stats_monthly();
+            break;
+        case 2:
+            print_title("班级耗材用量排行榜");
+            stats_class_ranking();
+            break;
+        case 3:
+            print_title("逾期未归还统计");
+            stats_overdue();
+            break;
+        case 4:
+            print_title("报废耗材成本统计");
+            stats_scrap_cost();
+            break;
         case 5: /* 全部概览 */
             print_title("统计概览");
             stats_monthly();
@@ -347,6 +358,7 @@ void stats_menu(void) {
             break;
         }
 
-        if (choice != 0) pause_screen();
+        if (choice != 0)
+            pause_screen();
     }
 }

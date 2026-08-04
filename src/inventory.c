@@ -6,9 +6,9 @@
  */
 
 #include "inventory.h"
-#include "material.h"
 #include "audit.h"
 #include "file_io.h"
+#include "material.h"
 #include "platform.h"
 #include "ui.h"
 
@@ -19,28 +19,39 @@
 
 #define STOCKTAKE_FILE "data/stocktake.dat"
 
-static StocktakeLog* g_log_list = NULL;
+static StocktakeLog *g_log_list = NULL;
 
 /* ============================================================
  * 内部辅助
  * ============================================================ */
 
-static void append_log(StocktakeLog* node) {
+static void append_log(StocktakeLog *node) {
     node->next = NULL;
-    if (!g_log_list) { g_log_list = node; return; }
-    StocktakeLog* p = g_log_list;
-    while (p->next) p = p->next;
+    if (!g_log_list) {
+        g_log_list = node;
+        return;
+    }
+    StocktakeLog *p = g_log_list;
+    while (p->next)
+        p = p->next;
     p->next = node;
 }
 
 static int save_logs(void) {
     int count = 0;
-    StocktakeLog* p = g_log_list;
-    while (p) { count++; p = p->next; }
-    if (count == 0) { remove(STOCKTAKE_FILE); return 0; }
+    StocktakeLog *p = g_log_list;
+    while (p) {
+        count++;
+        p = p->next;
+    }
+    if (count == 0) {
+        remove(STOCKTAKE_FILE);
+        return 0;
+    }
 
-    StocktakeLog* arr = (StocktakeLog*)malloc(sizeof(StocktakeLog) * count);
-    if (!arr) return -1;
+    StocktakeLog *arr = (StocktakeLog *)malloc(sizeof(StocktakeLog) * count);
+    if (!arr)
+        return -1;
     p = g_log_list;
     for (int i = 0; i < count; i++) {
         arr[i] = *p;
@@ -52,9 +63,9 @@ static int save_logs(void) {
     return ret;
 }
 
-static void gen_log_id(char* buf, size_t bufsz) {
+static void gen_log_id(char *buf, size_t bufsz) {
     time_t now = time(NULL);
-    struct tm* tm = localtime(&now);
+    struct tm *tm = localtime(&now);
     int count = inventory_log_count();
     strftime(buf, bufsz, "LOG-%Y%m%d-", tm);
     char num[16];
@@ -68,18 +79,20 @@ static void gen_log_id(char* buf, size_t bufsz) {
 
 int inventory_init(void) {
     int count = 0;
-    StocktakeLog* arr = (StocktakeLog*)file_read_all(STOCKTAKE_FILE,
-                                                      sizeof(StocktakeLog),
-                                                      &count);
+    StocktakeLog *arr = (StocktakeLog *)file_read_all(STOCKTAKE_FILE, sizeof(StocktakeLog), &count);
     if (count == -1) {
         fprintf(stderr, "[警告] 盘点日志文件损坏，将创建空记录\n");
         remove(STOCKTAKE_FILE);
         return 0;
     }
-    if (!arr || count == 0) return 0;
+    if (!arr || count == 0)
+        return 0;
     for (int i = 0; i < count; i++) {
-        StocktakeLog* node = (StocktakeLog*)malloc(sizeof(StocktakeLog));
-        if (!node) { free(arr); return -1; }
+        StocktakeLog *node = (StocktakeLog *)malloc(sizeof(StocktakeLog));
+        if (!node) {
+            free(arr);
+            return -1;
+        }
         *node = arr[i];
         append_log(node);
     }
@@ -89,8 +102,12 @@ int inventory_init(void) {
 
 void inventory_shutdown(void) {
     save_logs();
-    StocktakeLog* p = g_log_list;
-    while (p) { StocktakeLog* n = p->next; free(p); p = n; }
+    StocktakeLog *p = g_log_list;
+    while (p) {
+        StocktakeLog *n = p->next;
+        free(p);
+        p = n;
+    }
     g_log_list = NULL;
 }
 
@@ -98,12 +115,14 @@ void inventory_shutdown(void) {
  * 盘点操作
  * ============================================================ */
 
-int inventory_stocktake_item(const char* material_id, int actual_stock,
-                              const char* operator_name, int auto_correct) {
-    if (!material_id || !operator_name || actual_stock < 0) return -999999;
+int inventory_stocktake_item(const char *material_id, int actual_stock, const char *operator_name,
+                             int auto_correct) {
+    if (!material_id || !operator_name || actual_stock < 0)
+        return -999999;
 
-    const Material* mat = material_find_by_id(material_id);
-    if (!mat) return -999999;
+    const Material *mat = material_find_by_id(material_id);
+    if (!mat)
+        return -999999;
 
     int book = mat->total_stock;
     int diff = actual_stock - book;
@@ -122,15 +141,16 @@ int inventory_stocktake_item(const char* material_id, int actual_stock,
     }
 
     /* 生成盘点日志 */
-    StocktakeLog* log = (StocktakeLog*)calloc(1, sizeof(StocktakeLog));
-    if (!log) return diff;
+    StocktakeLog *log = (StocktakeLog *)calloc(1, sizeof(StocktakeLog));
+    if (!log)
+        return diff;
     gen_log_id(log->log_id, sizeof(log->log_id));
     strncpy(log->material_id, material_id, sizeof(log->material_id) - 1);
-    log->book_value   = book;
+    log->book_value = book;
     log->actual_value = actual_stock;
-    log->diff         = diff;
+    log->diff = diff;
     strncpy(log->operator_name, operator_name, sizeof(log->operator_name) - 1);
-    log->check_time   = time(NULL);
+    log->check_time = time(NULL);
     append_log(log);
     save_logs();
     if (auto_correct && diff != 0) {
@@ -139,11 +159,13 @@ int inventory_stocktake_item(const char* material_id, int actual_stock,
     return diff;
 }
 
-void inventory_log_page(int page, int* total_pages) {
-    if (page < 1) page = 1;
+void inventory_log_page(int page, int *total_pages) {
+    if (page < 1)
+        page = 1;
     int total = inventory_log_count();
     *total_pages = (total == 0) ? 1 : (total + PAGE_SIZE - 1) / PAGE_SIZE;
-    if (page > *total_pages) page = *total_pages;
+    if (page > *total_pages)
+        page = *total_pages;
 
     if (total == 0) {
         printf("\n  [提示] 暂无盘点日志。\n");
@@ -151,21 +173,21 @@ void inventory_log_page(int page, int* total_pages) {
     }
 
     printf("\n");
-    printf("  %-22s %-12s %6s %6s %6s %s\n",
-           "日志编号", "耗材编号", "账面", "实际", "差异", "盘点时间");
+    printf("  %-22s %-12s %6s %6s %6s %s\n", "日志编号", "耗材编号", "账面", "实际", "差异",
+           "盘点时间");
     print_line();
 
     int start = (page - 1) * PAGE_SIZE;
     int idx = 0, shown = 0;
-    StocktakeLog* p = g_log_list;
-    while (p && idx < start) { idx++; p = p->next; }
+    StocktakeLog *p = g_log_list;
+    while (p && idx < start) {
+        idx++;
+        p = p->next;
+    }
     while (p && shown < PAGE_SIZE) {
         char time_buf[20];
-        strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M",
-                 localtime(&p->check_time));
-        printf("  %-22s %-12s %6d %6d ",
-               p->log_id, p->material_id,
-               p->book_value, p->actual_value);
+        strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M", localtime(&p->check_time));
+        printf("  %-22s %-12s %6d %6d ", p->log_id, p->material_id, p->book_value, p->actual_value);
         if (p->diff != 0) {
             set_color_red();
             printf("%+6d", p->diff);
@@ -183,7 +205,10 @@ void inventory_log_page(int page, int* total_pages) {
 
 int inventory_log_count(void) {
     int count = 0;
-    StocktakeLog* p = g_log_list;
-    while (p) { count++; p = p->next; }
+    StocktakeLog *p = g_log_list;
+    while (p) {
+        count++;
+        p = p->next;
+    }
     return count;
 }

@@ -23,7 +23,7 @@ extern "C" {
  * 模块生命周期
  * ============================================================ */
 
-int  inventory_init(void);
+int inventory_init(void);
 void inventory_shutdown(void);
 
 /* ============================================================
@@ -38,13 +38,13 @@ void inventory_shutdown(void);
  * @param auto_correct  1=用实际值修正账面值，0=仅记录不修正
  * @return 差异值（actual - book），-999999 表示耗材不存在
  */
-int inventory_stocktake_item(const char* material_id, int actual_stock,
-                              const char* operator_name, int auto_correct);
+int inventory_stocktake_item(const char *material_id, int actual_stock, const char *operator_name,
+                             int auto_correct);
 
 /**
  * @brief 分页展示盘点日志
  */
-void inventory_log_page(int page, int* total_pages);
+void inventory_log_page(int page, int *total_pages);
 
 /**
  * @brief 盘点日志总数

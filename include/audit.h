@@ -19,7 +19,7 @@ extern "C" {
  * 模块生命周期
  * ============================================================ */
 
-int  audit_init(void);
+int audit_init(void);
 void audit_shutdown(void);
 
 /* ============================================================
@@ -33,8 +33,7 @@ void audit_shutdown(void);
  * @param detail    操作详情描述
  * @param operator_name 操作者用户名（传 NULL 则使用当前登录用户）
  */
-void audit_log(int action, const char* target_id,
-               const char* detail, const char* operator_name);
+void audit_log(int action, const char *target_id, const char *detail, const char *operator_name);
 
 /* ============================================================
  * 查询
@@ -47,8 +46,7 @@ void audit_log(int action, const char* target_id,
  * @param filter_action 筛选操作类型（-1 表示全部）
  * @param filter_operator 筛选操作者（空串表示全部）
  */
-void audit_list_page(int page, int* total_pages,
-                     int filter_action, const char* filter_operator);
+void audit_list_page(int page, int *total_pages, int filter_action, const char *filter_operator);
 
 /**
  * @brief 审计日志总数
@@ -58,7 +56,7 @@ int audit_count(void);
 /**
  * @brief 获取操作类型的中文名称
  */
-const char* audit_action_name(int action);
+const char *audit_action_name(int action);
 
 #ifdef __cplusplus
 }

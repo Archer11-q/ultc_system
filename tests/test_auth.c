@@ -9,14 +9,14 @@
  *          - 管理员增删改查
  */
 
-#include "types.h"
 #include "auth.h"
 #include "platform.h"
+#include "types.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
 /* 测试用数据文件（避免污染真实数据） */
 #define TEST_ADMIN_FILE "data/admin.dat"
@@ -28,7 +28,7 @@ static int g_failed = 0;
  * 测试辅助
  * ============================================================ */
 
-static void run_test(const char* name, void (*fn)(void)) {
+static void run_test(const char *name, void (*fn)(void)) {
     printf("  %-50s ... ", name);
     fn();
     printf("[PASS]\n");
@@ -143,13 +143,13 @@ static void test_add_duplicate_rejected(void) {
 static void test_ta_cannot_add_admin(void) {
     /* 当前以 ta01（助教）登录 */
     int ret = auth_add_admin("ta02", "pass", ROLE_TA);
-    assert(ret == -1);  /* 权限不足 */
+    assert(ret == -1); /* 权限不足 */
 }
 
 /** 测试11：助教无法删除管理员 */
 static void test_ta_cannot_delete_admin(void) {
     int ret = auth_delete_admin("admin");
-    assert(ret == -1);  /* 权限不足 */
+    assert(ret == -1); /* 权限不足 */
 }
 
 /** 测试12：管理员可以删除其他管理员 */
@@ -210,50 +210,50 @@ int main(void) {
     run_test("首次运行创建默认管理员 admin/admin123", test_default_admin_created);
 
     printf("\n[登录流程]\n");
-    run_test("正确密码登录成功",                  test_login_success);
-    run_test("错误密码返回 AUTH_WRONG_PASSWORD",    test_login_wrong_password);
-    run_test("不存在用户返回 AUTH_USER_NOT_FOUND",  test_login_user_not_found);
-    run_test("退出登录后 session 清空",            test_logout_clears_session);
+    run_test("正确密码登录成功", test_login_success);
+    run_test("错误密码返回 AUTH_WRONG_PASSWORD", test_login_wrong_password);
+    run_test("不存在用户返回 AUTH_USER_NOT_FOUND", test_login_user_not_found);
+    run_test("退出登录后 session 清空", test_logout_clears_session);
 
     printf("\n[锁定机制]\n");
     /* 重置环境，确保锁定计数从 0 开始 */
     reset_env();
-    run_test("连续3次错误触发锁定",               test_lock_after_3_failures);
-    run_test("锁定期间无法登录",                   test_cannot_login_during_lock);
+    run_test("连续3次错误触发锁定", test_lock_after_3_failures);
+    run_test("锁定期间无法登录", test_cannot_login_during_lock);
 
     /* 注意：锁定超时测试需要等待，跳过自动测试
      * 手动验证时：锁定10秒后应能正常登录 */
 
     /* 重置环境以解除锁定 */
     reset_env();
-    run_test("正确登录后锁定计数归零",             test_lock_reset_on_success);
+    run_test("正确登录后锁定计数归零", test_lock_reset_on_success);
 
     printf("\n[管理员管理]\n");
     /* 确保以管理员身份运行管理操作测试 */
     auth_login("admin", "admin123");
-    run_test("新增管理员（助教）",                 test_add_admin);
+    run_test("新增管理员（助教）", test_add_admin);
 
     /* test_add_admin 最后切换到了 ta01，切回 admin 继续 */
     auth_logout();
     auth_login("admin", "admin123");
 
-    run_test("重复用户名拒绝",                     test_add_duplicate_rejected);
+    run_test("重复用户名拒绝", test_add_duplicate_rejected);
 
     /* 切换到 ta01 测试权限不足场景 */
     auth_logout();
     auth_login("ta01", "pass123");
-    run_test("助教权限不足无法新增",               test_ta_cannot_add_admin);
-    run_test("助教权限不足无法删除",               test_ta_cannot_delete_admin);
+    run_test("助教权限不足无法新增", test_ta_cannot_add_admin);
+    run_test("助教权限不足无法删除", test_ta_cannot_delete_admin);
 
     /* 切回 admin 进行删除和密码测试 */
     auth_logout();
     auth_login("admin", "admin123");
-    run_test("管理员可删除其他管理员",             test_admin_can_delete);
+    run_test("管理员可删除其他管理员", test_admin_can_delete);
 
     /* test_admin_can_delete 末尾 login 失败导致登出，重新登录 */
     auth_login("admin", "admin123");
-    run_test("不能删除自己",                       test_cannot_delete_self);
-    run_test("修改密码后新旧密码正确切换",         test_change_password);
+    run_test("不能删除自己", test_cannot_delete_self);
+    run_test("修改密码后新旧密码正确切换", test_change_password);
 
     /* 清理 */
     auth_logout();

@@ -9,8 +9,8 @@
 #ifndef FILE_IO_H
 #define FILE_IO_H
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,9 +22,9 @@ extern "C" {
 
 #pragma pack(push, 1)
 typedef struct {
-    uint32_t magic;     /**< 魔数 0x554C5443 ("ULTC")         */
-    uint16_t version;   /**< 文件格式版本号                    */
-    uint32_t count;     /**< 记录条数                          */
+    uint32_t magic;   /**< 魔数 0x554C5443 ("ULTC")         */
+    uint16_t version; /**< 文件格式版本号                    */
+    uint32_t count;   /**< 记录条数                          */
 } FileHeader;
 #pragma pack(pop)
 
@@ -41,8 +41,7 @@ typedef struct {
  * @return 0 成功，-1 失败
  * ============================================================ */
 
-int file_write_all(const char* filename, const void* data,
-                   size_t elem_size, int count);
+int file_write_all(const char *filename, const void *data, size_t elem_size, int count);
 
 /* ============================================================
  * 读取二进制文件
@@ -55,7 +54,7 @@ int file_write_all(const char* filename, const void* data,
  *         文件损坏返回 NULL（out_count=-1）
  * ============================================================ */
 
-void* file_read_all(const char* filename, size_t elem_size, int* out_count);
+void *file_read_all(const char *filename, size_t elem_size, int *out_count);
 
 #ifdef __cplusplus
 }

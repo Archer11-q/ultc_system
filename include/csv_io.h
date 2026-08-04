@@ -30,7 +30,7 @@ extern "C" {
  * @param operator_name 操作员
  * @return 成功导入条数，-1 表示文件无法打开
  */
-int csv_import_materials(const char* filepath, const char* operator_name);
+int csv_import_materials(const char *filepath, const char *operator_name);
 
 /* ============================================================
  * 导出
@@ -41,21 +41,21 @@ int csv_import_materials(const char* filepath, const char* operator_name);
  * @param filepath 导出路径
  * @return 0 成功，-1 失败
  */
-int csv_export_materials(const char* filepath);
+int csv_export_materials(const char *filepath);
 
 /**
  * @brief 导出采购清单为 CSV
  * @param filepath 导出路径
  * @return 0 成功，-1 失败
  */
-int csv_export_purchase_list(const char* filepath);
+int csv_export_purchase_list(const char *filepath);
 
 /**
  * @brief 导出全部领用记录为 CSV
  * @param filepath 导出路径
  * @return 0 成功，-1 失败
  */
-int csv_export_borrow_records(const char* filepath);
+int csv_export_borrow_records(const char *filepath);
 
 #ifdef __cplusplus
 }

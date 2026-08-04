@@ -19,11 +19,11 @@ extern "C" {
  * 登录结果码
  * ============================================================ */
 
-#define AUTH_OK             0   /**< 登录成功                   */
-#define AUTH_USER_NOT_FOUND -1  /**< 用户名不存在               */
-#define AUTH_WRONG_PASSWORD -2  /**< 密码错误                   */
-#define AUTH_LOCKED         -3  /**< 账号已锁定，请稍后重试     */
-#define AUTH_ALREADY_EXISTS -4  /**< 用户名已存在（添加时）     */
+#define AUTH_OK 0              /**< 登录成功                   */
+#define AUTH_USER_NOT_FOUND -1 /**< 用户名不存在               */
+#define AUTH_WRONG_PASSWORD -2 /**< 密码错误                   */
+#define AUTH_LOCKED -3         /**< 账号已锁定，请稍后重试     */
+#define AUTH_ALREADY_EXISTS -4 /**< 用户名已存在（添加时）     */
 
 /* ============================================================
  * 模块生命周期
@@ -54,7 +54,7 @@ void auth_shutdown(void);
  * @param password 密码
  * @return AUTH_OK 成功，其他负值见结果码定义
  */
-int auth_login(const char* username, const char* password);
+int auth_login(const char *username, const char *password);
 
 /**
  * @brief 退出当前登录
@@ -65,7 +65,7 @@ void auth_logout(void);
  * @brief 获取当前登录用户名
  * @return 未登录返回空串 ""
  */
-const char* auth_current_user(void);
+const char *auth_current_user(void);
 
 /**
  * @brief 获取当前登录角色
@@ -84,14 +84,14 @@ int auth_current_role(void);
  * @param role     角色（ROLE_ADMIN 或 ROLE_TA）
  * @return AUTH_OK 成功，AUTH_ALREADY_EXISTS 用户名重复，-1 权限不足
  */
-int auth_add_admin(const char* username, const char* password, int role);
+int auth_add_admin(const char *username, const char *password, int role);
 
 /**
  * @brief 删除管理员
  * @param username 用户名
  * @return 0 成功，-1 不存在或权限不足
  */
-int auth_delete_admin(const char* username);
+int auth_delete_admin(const char *username);
 
 /**
  * @brief 修改管理员密码
@@ -99,7 +99,7 @@ int auth_delete_admin(const char* username);
  * @param new_password 新密码
  * @return 0 成功，-1 失败
  */
-int auth_change_password(const char* username, const char* new_password);
+int auth_change_password(const char *username, const char *new_password);
 
 /**
  * @brief 列出全部管理员（控制台打印）
@@ -111,7 +111,7 @@ void auth_list_admins(void);
  * @param username 用户名
  * @return 剩余锁定秒数，0 表示未锁定
  */
-int auth_lock_remaining(const char* username);
+int auth_lock_remaining(const char *username);
 
 #ifdef __cplusplus
 }

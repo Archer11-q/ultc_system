@@ -8,11 +8,11 @@
 #include "platform.h"
 
 #ifdef _WIN32
-    #include <conio.h>
-    #include <windows.h>
+#include <conio.h>
+#include <windows.h>
 #else
-    #include <termios.h>
-    #include <unistd.h>
+#include <termios.h>
+#include <unistd.h>
 #endif
 
 #include <stdio.h>
@@ -21,15 +21,17 @@
  * 密码输入（回显为 '*'）
  * ============================================================ */
 
-int get_password(char* buf, int maxlen) {
-    if (!buf || maxlen <= 0) return -1;
+int get_password(char *buf, int maxlen) {
+    if (!buf || maxlen <= 0)
+        return -1;
 
     int i = 0;
 
 #ifdef _WIN32
     while (i < maxlen - 1) {
         int ch = _getch();
-        if (ch == '\r' || ch == '\n') break;
+        if (ch == '\r' || ch == '\n')
+            break;
         if (ch == '\b' || ch == 127) {
             if (i > 0) {
                 i--;
@@ -37,7 +39,7 @@ int get_password(char* buf, int maxlen) {
             }
             continue;
         }
-        if (ch == 3) {          /* Ctrl+C */
+        if (ch == 3) { /* Ctrl+C */
             buf[0] = '\0';
             return -1;
         }
@@ -54,7 +56,8 @@ int get_password(char* buf, int maxlen) {
 
     while (i < maxlen - 1) {
         int ch = getchar();
-        if (ch == '\n' || ch == '\r') break;
+        if (ch == '\n' || ch == '\r')
+            break;
         if (ch == 127 || ch == '\b') {
             if (i > 0) {
                 i--;

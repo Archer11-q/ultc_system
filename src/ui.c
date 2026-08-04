@@ -7,10 +7,10 @@
 #include "ui.h"
 #include "platform.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
 /* ============================================================
  * 界面装饰
@@ -24,14 +24,14 @@ void print_line(void) {
     printf("──────────────────────────────────────────────────────────────\n");
 }
 
-void print_title(const char* title) {
+void print_title(const char *title) {
     clear_screen();
     print_separator();
     printf("  %s\n", title);
     print_separator();
 }
 
-void print_subtitle(const char* subtitle) {
+void print_subtitle(const char *subtitle) {
     printf("\n");
     print_line();
     printf("  %s\n", subtitle);
@@ -53,7 +53,7 @@ static void flush_stdin(void) {
  * 读取整数
  * ============================================================ */
 
-int read_int(const char* prompt, int min, int max) {
+int read_int(const char *prompt, int min, int max) {
     int val;
     char buf[64];
 
@@ -69,7 +69,7 @@ int read_int(const char* prompt, int min, int max) {
             flush_stdin();
         }
 
-        char* end = NULL;
+        char *end = NULL;
         val = (int)strtol(buf, &end, 10);
         if (end == buf) {
             printf("  [提示] 请输入整数 (%d ~ %d)\n", min, max);
@@ -77,7 +77,8 @@ int read_int(const char* prompt, int min, int max) {
         }
 
         /* 跳过尾部空白 */
-        while (*end && isspace((unsigned char)*end)) end++;
+        while (*end && isspace((unsigned char)*end))
+            end++;
         if (*end != '\0') {
             printf("  [提示] 请输入整数 (%d ~ %d)\n", min, max);
             continue;
@@ -96,25 +97,28 @@ int read_int(const char* prompt, int min, int max) {
  * 读取浮点数
  * ============================================================ */
 
-double read_double(const char* prompt, double min, double max) {
+double read_double(const char *prompt, double min, double max) {
     double val;
     char buf[64];
 
     while (1) {
         printf("%s", prompt);
-        if (!fgets(buf, sizeof(buf), stdin)) continue;
+        if (!fgets(buf, sizeof(buf), stdin))
+            continue;
 
         size_t len = strlen(buf);
-        if (len > 0 && buf[len - 1] != '\n') flush_stdin();
+        if (len > 0 && buf[len - 1] != '\n')
+            flush_stdin();
 
-        char* end = NULL;
+        char *end = NULL;
         val = strtod(buf, &end);
         if (end == buf) {
             printf("  [提示] 请输入数字\n");
             continue;
         }
 
-        while (*end && isspace((unsigned char)*end)) end++;
+        while (*end && isspace((unsigned char)*end))
+            end++;
         if (*end != '\0') {
             printf("  [提示] 请输入有效数字\n");
             continue;
@@ -133,10 +137,11 @@ double read_double(const char* prompt, double min, double max) {
  * 读取字符串
  * ============================================================ */
 
-void read_string(const char* prompt, char* buf, int maxlen) {
+void read_string(const char *prompt, char *buf, int maxlen) {
     while (1) {
         printf("%s", prompt);
-        if (!fgets(buf, maxlen, stdin)) continue;
+        if (!fgets(buf, maxlen, stdin))
+            continue;
 
         size_t len = strlen(buf);
         if (len > 0 && buf[len - 1] != '\n') {
@@ -160,9 +165,10 @@ void read_string(const char* prompt, char* buf, int maxlen) {
  * 确认操作
  * ============================================================ */
 
-int confirm(const char* prompt) {
+int confirm(const char *prompt) {
     char buf[8];
     printf("%s (y/n): ", prompt);
-    if (!fgets(buf, sizeof(buf), stdin)) return 0;
+    if (!fgets(buf, sizeof(buf), stdin))
+        return 0;
     return (buf[0] == 'y' || buf[0] == 'Y');
 }
