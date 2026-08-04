@@ -7,6 +7,7 @@
 
 #include "borrow.h"
 #include "file_io.h"
+#include "audit.h"
 #include "platform.h"
 #include "ui.h"
 
@@ -210,6 +211,8 @@ int borrow_create(const BorrowRecord* rec) {
 
     append_borrow(node);
     save_borrows();
+    audit_log(AUDIT_BORROW, rec->record_id, rec->student_name,
+              rec->operator_name);
     return 0;
 }
 
@@ -278,7 +281,12 @@ int borrow_return_session(const char* record_id, const char* damage_note) {
     }
 
     if (!found_any) return -1;
-    if (returned > 0) save_borrows();
+    if (returned > 0) {
+        save_borrows();
+        audit_log(AUDIT_RETURN, record_id,
+                  (damage_note && damage_note[0]) ? damage_note : "正常归还",
+                  NULL);
+    }
     return returned;
 }
 

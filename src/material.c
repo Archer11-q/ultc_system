@@ -7,6 +7,7 @@
 
 #include "material.h"
 #include "file_io.h"
+#include "audit.h"
 #include "platform.h"
 #include "ui.h"
 
@@ -204,6 +205,7 @@ int material_add(const Material* mat) {
 
     append_mat(node);
     save_materials();
+    audit_log(AUDIT_MAT_ADD, mat->id, mat->name, NULL);
     return 0;
 }
 
@@ -223,6 +225,7 @@ int material_update(const Material* mat) {
     target->purchase_date  = mat->purchase_date;
 
     save_materials();
+    audit_log(AUDIT_MAT_EDIT, mat->id, mat->name, NULL);
     return 0;
 }
 
@@ -237,6 +240,7 @@ int material_delete(const char* id) {
             else      g_mat_list = curr->next;
             free(curr);
             save_materials();
+            audit_log(AUDIT_MAT_DELETE, id, "删除耗材", NULL);
             return 0;
         }
         prev = curr;
@@ -306,6 +310,7 @@ int material_scrap(const char* material_id, int quantity,
     /* 持久化 */
     save_materials();
     save_scraps();
+    audit_log(AUDIT_MAT_SCRAP, material_id, reason, operator_name);
     return 0;
 }
 

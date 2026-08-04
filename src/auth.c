@@ -7,6 +7,7 @@
 
 #include "auth.h"
 #include "file_io.h"
+#include "audit.h"
 #include "platform.h"
 #include "ui.h"
 
@@ -247,6 +248,7 @@ int auth_add_admin(const char* username, const char* password, int role) {
 
     append_admin(node);
     save_admins();
+    audit_log(AUDIT_ADMIN_ADD, username, "新增管理员", NULL);
     return AUTH_OK;
 }
 
@@ -269,6 +271,7 @@ int auth_delete_admin(const char* username) {
             }
             free(curr);
             save_admins();
+            audit_log(AUDIT_ADMIN_DEL, username, "删除管理员", NULL);
             return 0;
         }
         prev = curr;
@@ -288,6 +291,7 @@ int auth_change_password(const char* username, const char* new_password) {
 
     strncpy(adm->password, new_password, sizeof(adm->password) - 1);
     save_admins();
+    audit_log(AUDIT_ADMIN_CHPWD, username, "修改密码", NULL);
     return 0;
 }
 

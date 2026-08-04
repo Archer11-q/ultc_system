@@ -80,7 +80,6 @@ static void menu_material_add(void) {
     int ret = material_add(&mat);
     if (ret == 0) {
         printf("\n  [提示] 耗材 '%s' 添加成功。\n", mat.id);
-        audit_log(AUDIT_MAT_ADD, mat.id, mat.name, auth_current_user());
     } else {
         printf("\n  [错误] 添加失败（%d）。\n", ret);
     }
@@ -127,7 +126,6 @@ static void menu_material_edit(void) {
     int ret = material_update(&mat);
     if (ret == 0) {
         printf("\n  [提示] 耗材 '%s' 修改成功。\n", id);
-        audit_log(AUDIT_MAT_EDIT, id, mat.name, auth_current_user());
     } else {
         printf("\n  [错误] 修改失败。\n");
     }
@@ -156,7 +154,6 @@ static void menu_material_delete(void) {
     int ret = material_delete(id);
     if (ret == 0) {
         printf("\n  [提示] 耗材 '%s' 已删除。\n", id);
-        audit_log(AUDIT_MAT_DELETE, id, mat->name, auth_current_user());
     } else {
         printf("\n  [错误] 删除失败。\n");
     }
@@ -379,7 +376,6 @@ static void menu_borrow_new(void) {
     print_title("领用回执");
     print_receipt(record_id, student_id, student_name,
                   class_name, project_id);
-    audit_log(AUDIT_BORROW, record_id, student_name, auth_current_user());
     pause_screen();
 }
 
@@ -473,13 +469,11 @@ static void menu_borrow_return(void) {
                            auth_current_user());
         }
         borrow_return_session(record_id, damage_note);
-        audit_log(AUDIT_RETURN, record_id, damage_note, auth_current_user());
         set_color_yellow();
         printf("\n  [提示] 已登记损坏并转入报废台账，库存已扣减。\n");
         reset_color();
     } else {
         borrow_return_session(record_id, "");
-        audit_log(AUDIT_RETURN, record_id, "正常归还", auth_current_user());
         set_color_green();
         printf("\n  [提示] 归还成功，库存未变动。\n");
         reset_color();
@@ -641,8 +635,6 @@ static void menu_inventory_stocktake(void) {
         if (diff != -999999) {
             checked++;
             if (auto_correct) {
-                audit_log(AUDIT_STOCKTAKE, mat_id, "修正库存差异",
-                          auth_current_user());
                 set_color_green();
                 printf("  [提示] 已修正，差异 %+d。\n", diff);
                 reset_color();
@@ -860,8 +852,6 @@ static void menu_admin_manage_add(void) {
 
     int ret = auth_add_admin(username, password, role);
     if (ret == AUTH_OK) {
-        audit_log(AUDIT_ADMIN_ADD, username, "新增管理员",
-                  auth_current_user());
         printf("\n  [提示] 管理员 '%s' 添加成功。\n", username);
     } else if (ret == AUTH_ALREADY_EXISTS) {
         printf("\n  [错误] 用户名 '%s' 已存在。\n", username);
@@ -890,8 +880,6 @@ static void menu_admin_manage_delete(void) {
 
     int ret = auth_delete_admin(username);
     if (ret == 0) {
-        audit_log(AUDIT_ADMIN_DEL, username, "删除管理员",
-                  auth_current_user());
         printf("\n  [提示] 管理员 '%s' 已删除。\n", username);
     } else {
         printf("\n  [错误] 删除失败（用户不存在）。\n");
@@ -914,8 +902,6 @@ static void menu_admin_manage_chpwd(void) {
 
     int ret = auth_change_password(username, new_password);
     if (ret == 0) {
-        audit_log(AUDIT_ADMIN_CHPWD, username, "修改密码",
-                  auth_current_user());
         printf("\n  [提示] 密码修改成功。\n");
     } else {
         printf("\n  [错误] 密码修改失败。\n");

@@ -7,6 +7,7 @@
 
 #include "inventory.h"
 #include "material.h"
+#include "audit.h"
 #include "file_io.h"
 #include "platform.h"
 #include "ui.h"
@@ -132,6 +133,9 @@ int inventory_stocktake_item(const char* material_id, int actual_stock,
     log->check_time   = time(NULL);
     append_log(log);
     save_logs();
+    if (auto_correct && diff != 0) {
+        audit_log(AUDIT_STOCKTAKE, material_id, "修正库存差异", operator_name);
+    }
     return diff;
 }
 

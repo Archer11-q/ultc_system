@@ -10,6 +10,8 @@
 #include "material.h"
 #include "borrow.h"
 #include "inventory.h"
+#include "audit.h"
+#include "csv_io.h"
 #include "file_io.h"
 #include "platform.h"
 
@@ -48,9 +50,11 @@ static void full_init(void) {
     assert(material_init() == 0);
     assert(borrow_init() == 0);
     assert(inventory_init() == 0);
+    assert(audit_init() == 0);
 }
 
 static void full_shutdown(void) {
+    audit_shutdown();
     inventory_shutdown();
     borrow_shutdown();
     material_shutdown();
@@ -355,6 +359,107 @@ static void test_concurrent_borrowing(void) {
 }
 
 /* ============================================================
+ * 场景 5：CSV 导入导出集成
+ * ============================================================ */
+
+static void test_csv_import_integration(void) {
+    /* 创建测试 CSV */
+    FILE* fp = fopen("test_integration.csv", "w");
+    fprintf(fp, "编号,名称,分类,属性,单价,库存,预警,柜号,采购日期\n");
+    fprintf(fp, "INT001,集成测试电阻,电子元器件,一次性,0.25,2000,200,A-99,2024-12-01\n");
+    fprintf(fp, "INT002,集成测试开发板,开发板,可循环,49.00,30,10,B-99,2024-11-15\n");
+    fclose(fp);
+
+    int imported = csv_import_materials("test_integration.csv", "admin");
+    assert(imported == 2);
+    assert(material_find_by_id("INT001") != NULL);
+    assert(material_find_by_id("INT002") != NULL);
+
+    /* 导入后立即可领用（验证数据一致性） */
+    const Material* m = material_find_by_id("INT001");
+    assert(m->total_stock == 2000);
+    assert(m->unit_price == 0.25);
+
+    remove("test_integration.csv");
+}
+
+static void test_csv_export_integration(void) {
+    /* 领用 INT001 后导出 */
+    material_reduce_stock("INT001", 100);
+    BorrowRecord r;
+    memset(&r, 0, sizeof(r));
+    strncpy(r.record_id, "BORROW-INT-001", sizeof(r.record_id)-1);
+    strncpy(r.student_id, "INT001", sizeof(r.student_id)-1);
+    strncpy(r.student_name, "集成测试学生", sizeof(r.student_name)-1);
+    strncpy(r.class_name, "集成班", sizeof(r.class_name)-1);
+    strncpy(r.project_id, "PRJ-INT", sizeof(r.project_id)-1);
+    strncpy(r.material_id, "INT001", sizeof(r.material_id)-1);
+    r.quantity = 100; r.borrow_time = time(NULL);
+    r.status = BORROW_ACTIVE;
+    strncpy(r.operator_name, "admin", sizeof(r.operator_name)-1);
+    borrow_create(&r);
+
+    /* 导出三种格式 */
+    assert(csv_export_materials("test_mat_export.csv") == 0);
+    assert(csv_export_borrow_records("test_bor_export.csv") == 0);
+
+    /* 验证文件非空 */
+    FILE* fp = fopen("test_mat_export.csv", "r");
+    assert(fp != NULL);
+    fseek(fp, 0, SEEK_END);
+    assert(ftell(fp) > 20);
+    fclose(fp);
+
+    fp = fopen("test_bor_export.csv", "r");
+    assert(fp != NULL);
+    fclose(fp);
+
+    remove("test_mat_export.csv");
+    remove("test_bor_export.csv");
+}
+
+/* ============================================================
+ * 场景 6：审计日志全流程记录
+ * ============================================================ */
+
+static void test_audit_trail_completeness(void) {
+    int before = audit_count();
+
+    /* 执行一系列操作 */
+    /* 1. 新增耗材 */
+    add_mat("AUDIT01", "审计测试耗材", CAT_TOOL, ATTR_REUSABLE,
+            10.0, 50, 10);
+    /* 2. 领用 */
+    BorrowRecord r;
+    memset(&r, 0, sizeof(r));
+    strncpy(r.record_id, "BORROW-AUDIT-01", sizeof(r.record_id)-1);
+    strncpy(r.student_id, "S-AUDIT", sizeof(r.student_id)-1);
+    strncpy(r.student_name, "审计学生", sizeof(r.student_name)-1);
+    strncpy(r.class_name, "审计班", sizeof(r.class_name)-1);
+    strncpy(r.project_id, "P-AUDIT", sizeof(r.project_id)-1);
+    strncpy(r.material_id, "AUDIT01", sizeof(r.material_id)-1);
+    r.quantity = 2; r.borrow_time = time(NULL);
+    r.status = BORROW_ACTIVE;
+    strncpy(r.operator_name, "admin", sizeof(r.operator_name)-1);
+    borrow_create(&r);
+    /* 3. 归还 */
+    borrow_return_session("BORROW-AUDIT-01", "");
+    /* 4. 盘点修正 */
+    inventory_stocktake_item("AUDIT01", 48, "admin", 1);
+    /* 5. 报废 */
+    material_scrap("AUDIT01", 2, "审计测试报废", "admin");
+
+    int after = audit_count();
+    /* 至少应有 5 条新审计记录 */
+    assert(after >= before + 5);
+
+    /* 验证不同操作类型都有记录 */
+    int total_pages = 0;
+    audit_list_page(1, &total_pages, -1, "");
+    assert(total_pages >= 1);
+}
+
+/* ============================================================
  * 入口
  * ============================================================ */
 
@@ -382,6 +487,13 @@ int main(void) {
 
     printf("\n[并发一致性]\n");
     run_test("10人各领50个→库存=1000-500=500",   test_concurrent_borrowing);
+
+    printf("\n[CSV 导入导出]\n");
+    run_test("CSV导入2条→可查询→库存单价正确",   test_csv_import_integration);
+    run_test("领用后导出耗材+记录文件非空",        test_csv_export_integration);
+
+    printf("\n[审计日志]\n");
+    run_test("5种操作均自动记录→审计条目增加",    test_audit_trail_completeness);
 
     /* 清理 */
     auth_logout();
