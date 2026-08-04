@@ -75,6 +75,16 @@ BorrowRecord* borrow_get_unreturned_by_student(const char* student_id,
 int borrow_return(const char* record_id, const char* damage_note);
 
 /**
+ * @brief 归还指定领用单号下的所有未归还记录（批量归还）
+ * @details 遍历该单号下所有 status != BORROW_RETURNED 的记录，
+ *          标记为已归还或报废（有损坏说明时）。
+ * @param record_id   领用单号
+ * @param damage_note 损坏说明（所有项共用，传 "" 表示正常归还）
+ * @return 归还的条数，0 表示无未归还记录，-1 表示单号不存在
+ */
+int borrow_return_session(const char* record_id, const char* damage_note);
+
+/**
  * @brief 获取逾期未归还的记录
  * @param out_count 输出参数
  * @return 记录数组（调用方 free）

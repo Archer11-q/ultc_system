@@ -252,6 +252,36 @@ int borrow_return(const char* record_id, const char* damage_note) {
     return -1;
 }
 
+int borrow_return_session(const char* record_id, const char* damage_note) {
+    if (!record_id) return -1;
+
+    int returned = 0;
+    int found_any = 0;
+    BorrowRecord* p = g_borrow_list;
+
+    while (p) {
+        if (strcmp(p->record_id, record_id) == 0) {
+            found_any = 1;
+            if (p->status != BORROW_RETURNED) {
+                if (damage_note && damage_note[0] != '\0') {
+                    p->status = BORROW_SCRAPPED;
+                    strncpy(p->damage_note, damage_note,
+                            sizeof(p->damage_note) - 1);
+                } else {
+                    p->status = BORROW_RETURNED;
+                }
+                p->return_time = time(NULL);
+                returned++;
+            }
+        }
+        p = p->next;
+    }
+
+    if (!found_any) return -1;
+    if (returned > 0) save_borrows();
+    return returned;
+}
+
 BorrowRecord* borrow_get_overdue_list(int* out_count) {
     return collect_filtered(pred_overdue, NULL, out_count);
 }

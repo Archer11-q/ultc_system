@@ -212,44 +212,78 @@ static void test_unreturned_by_student(void) {
     assert(count == 0);
 }
 
-/** 正常归还 */
-static void test_return_normal(void) {
-    /* 归还单条记录（可循环的 DEV001 那条） */
-    /* 注意 borrow_return 按 record_id 匹配。同一单号有2条，
-     * 归还时会匹配到第一条 R001 的。先只测归还不存在冲突的记录 */
-    int ret = borrow_return("BORROW-20260804-004", "");
-    assert(ret == 0);
+/** 批量归还（borrow_return_session） */
+static void test_return_session(void) {
+    /* BORROW-20260804-004 下有2条记录（R001一次性+DEV001可循环） */
+    int ret = borrow_return_session("BORROW-20260804-004", "");
+    assert(ret == 2);  /* 归还了2条 */
 
     /* 再次查询应排除已归还的 */
     int count = 0;
     BorrowRecord* items = borrow_get_unreturned_by_student("2021004", &count);
-    /* 2 条记录中第1条被标记为已归还 */
-    assert(count == 1);
+    assert(count == 0);  /* 全部归还 */
     free(items);
 }
 
-/** 重复归还拒绝 */
+/** 已全部归还后再归还返回 0 */
 static void test_return_already_returned(void) {
-    int ret = borrow_return("BORROW-20260804-004", "");
-    assert(ret == -2);  /* 已归还 */
+    int ret = borrow_return_session("BORROW-20260804-004", "");
+    assert(ret == 0);  /* 没有未归还的了 */
 }
 
-/** 损坏归还 → 报废 */
-static void test_return_with_damage(void) {
+/** 损坏归还 → 报废（含 scrap 联动） */
+static void test_return_with_damage_and_scrap(void) {
     /* 先创建一条可循环工具的领用记录 */
     BorrowRecord r = make_borrow("BORROW-20260804-005",
-                                  "2021005", "DEV001", 1);
+                                  "2021005", "DEV001", 2);
     r.borrow_time = time(NULL) - 86400;  /* 1 天前 */
     borrow_create(&r);
 
-    int ret = borrow_return("BORROW-20260804-005", "屏幕碎裂");
-    assert(ret == 0);
+    /* 记录归还前库存 */
+    const Material* mat_before = material_find_by_id("DEV001");
+    int stock_before = mat_before->total_stock;
 
+    /* 模拟完整归还+报废流程：先 material_scrap，再 borrow_return_session */
+    int scrap_ret = material_scrap("DEV001", 2, "归还时发现屏幕碎裂", "admin");
+    assert(scrap_ret == 0);
+
+    int ret = borrow_return_session("BORROW-20260804-005", "归还时发现屏幕碎裂");
+    assert(ret == 1);
+
+    /* 验证状态 */
     int count = 0;
     BorrowRecord* items = borrow_get_by_record_id("BORROW-20260804-005", &count);
     assert(items != NULL);
     assert(items[0].status == BORROW_SCRAPPED);
-    assert(strcmp(items[0].damage_note, "屏幕碎裂") == 0);
+    assert(strcmp(items[0].damage_note, "归还时发现屏幕碎裂") == 0);
+    free(items);
+
+    /* 验证库存扣减 */
+    const Material* mat_after = material_find_by_id("DEV001");
+    assert(mat_after->total_stock == stock_before - 2);
+}
+
+/** 正常归还无损坏（不扣库存） */
+static void test_return_normal_no_scrap(void) {
+    /* 创建可循环工具领用 */
+    BorrowRecord r = make_borrow("BORROW-20260804-006",
+                                  "2021006", "DEV001", 1);
+    borrow_create(&r);
+
+    const Material* mat_before = material_find_by_id("DEV001");
+    int stock_before = mat_before->total_stock;
+
+    /* 正常归还（无损坏） */
+    int ret = borrow_return_session("BORROW-20260804-006", "");
+    assert(ret == 1);
+
+    /* 库存不应变化 */
+    const Material* mat_after = material_find_by_id("DEV001");
+    assert(mat_after->total_stock == stock_before);
+
+    int count = 0;
+    BorrowRecord* items = borrow_get_by_record_id("BORROW-20260804-006", &count);
+    assert(items[0].status == BORROW_RETURNED);
     free(items);
 }
 
@@ -329,9 +363,10 @@ int main(void) {
     run_test("按学号查询未归还记录",               test_unreturned_by_student);
 
     printf("\n[归还]\n");
-    run_test("正常归还 → 状态变为已归还",          test_return_normal);
-    run_test("已归还记录再次归还返回 -2",           test_return_already_returned);
-    run_test("损坏归还 → 转入报废 + 损坏备注",     test_return_with_damage);
+    run_test("批量归还 2 条 → 全部已归还",         test_return_session);
+    run_test("全部已归还后再归还返回 0",            test_return_already_returned);
+    run_test("损坏归还+scrap联动 → 库存扣减+报废",  test_return_with_damage_and_scrap);
+    run_test("正常归还无损坏 → 库存不变",          test_return_normal_no_scrap);
 
     printf("\n[逾期]\n");
     run_test("8天前记录被判为逾期",                test_overdue_detection);

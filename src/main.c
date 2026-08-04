@@ -379,8 +379,172 @@ static void menu_borrow_new(void) {
     pause_screen();
 }
 
-static void menu_borrow_return(void)   { placeholder("耗材归还"); }
-static void menu_borrow_overdue(void)  { placeholder("逾期管理"); }
+static void menu_borrow_return(void) {
+    print_title("耗材归还");
+
+    /* 输入学号 */
+    char student_id[MAX_STUDENT_ID];
+    read_string("  学号: ", student_id, sizeof(student_id));
+
+    /* 列出该学生所有未归还记录 */
+    int count = 0;
+    BorrowRecord* items = borrow_get_unreturned_by_student(student_id, &count);
+    if (!items || count == 0) {
+        printf("\n  [提示] 该学生没有未归还的耗材。\n");
+        pause_screen();
+        return;
+    }
+
+    printf("\n  该学生有 %d 条未归还记录:\n", count);
+    print_line();
+    printf("  %-3s %-22s %-12s %-12s %-6s %s\n",
+           "序号", "领用单号", "耗材编号", "耗材名称", "数量", "属性");
+    print_line();
+
+    for (int i = 0; i < count; i++) {
+        const Material* mat = material_find_by_id(items[i].material_id);
+        const char* mat_name = mat ? mat->name : "（已删除）";
+        const char* attr_str = (mat && mat->attr == ATTR_REUSABLE)
+                                   ? "可循环" : "一次性";
+
+        /* 检查是否逾期 */
+        double days = difftime(time(NULL), items[i].borrow_time) / 86400.0;
+        const char* overdue_mark = (days > OVERDUE_DAYS) ? " ★逾期" : "";
+
+        printf("  %-3d %-22s %-12s %-12s %-6d %s%s\n",
+               i + 1, items[i].record_id, items[i].material_id,
+               mat_name, items[i].quantity, attr_str, overdue_mark);
+    }
+    print_line();
+
+    /* 选择要归还的领用单号 */
+    printf("\n");
+    char record_id[MAX_RECORD_ID];
+    read_string("  输入要归还的领用单号: ", record_id, sizeof(record_id));
+
+    /* 验证单号是否在未归还列表中 */
+    int valid = 0;
+    int is_reusable = 0;
+    int quantity = 0;
+    char mat_id[MAX_MAT_ID] = "";
+    for (int i = 0; i < count; i++) {
+        if (strcmp(items[i].record_id, record_id) == 0) {
+            valid = 1;
+            const Material* mat = material_find_by_id(items[i].material_id);
+            if (mat && mat->attr == ATTR_REUSABLE) {
+                is_reusable = 1;
+                quantity = items[i].quantity;
+                strncpy(mat_id, items[i].material_id, sizeof(mat_id) - 1);
+            }
+            break;
+        }
+    }
+
+    if (!valid) {
+        printf("\n  [错误] 领用单号不在未归还列表中。\n");
+        free(items);
+        pause_screen();
+        return;
+    }
+
+    /* 一次性耗材无需归还（领用时已扣库存） */
+    if (!is_reusable) {
+        printf("\n  [提示] 该耗材为一次性耗材，领用时已扣减库存，无需归还。\n");
+        printf("  系统将自动标记为已归还。\n");
+        borrow_return_session(record_id, "");
+        free(items);
+        pause_screen();
+        return;
+    }
+
+    /* 可循环耗材：询问是否损坏 */
+    printf("\n  该耗材为可循环耗材，归还时请检查是否损坏。\n");
+    if (confirm("  耗材是否有损坏？")) {
+        char damage_note[MAX_DAMAGE_NOTE];
+        read_string("  损坏情况说明: ", damage_note, sizeof(damage_note));
+
+        /* 损坏 → 报废：扣库存 + 写报废记录 */
+        if (mat_id[0] != '\0') {
+            material_scrap(mat_id, quantity, damage_note,
+                           auth_current_user());
+        }
+        borrow_return_session(record_id, damage_note);
+        set_color_yellow();
+        printf("\n  [提示] 已登记损坏并转入报废台账，库存已扣减。\n");
+        reset_color();
+    } else {
+        borrow_return_session(record_id, "");
+        set_color_green();
+        printf("\n  [提示] 归还成功，库存未变动。\n");
+        reset_color();
+    }
+
+    free(items);
+    pause_screen();
+}
+
+static void menu_borrow_overdue(void) {
+    print_title("逾期管理");
+
+    /* 先自动刷新逾期状态：将超 7 天且状态为 ACTIVE 的记录标记为 OVERDUE */
+    int overdue_count = 0;
+    BorrowRecord* overdue = borrow_get_overdue_list(&overdue_count);
+
+    if (!overdue || overdue_count == 0) {
+        printf("\n  [提示] 当前没有逾期未归还的记录。\n");
+        pause_screen();
+        return;
+    }
+
+    /* 逾期统计 */
+    set_color_red();
+    printf("\n  当前逾期记录: %d 条\n", overdue_count);
+    reset_color();
+
+    /* 统计逾期学生 */
+    printf("\n  ── 逾期学生名单 ──\n");
+    printf("  %-4s %-12s %-14s %-22s %s\n",
+           "序号", "学号", "姓名", "领用单号", "逾期天数");
+    print_line();
+
+    /* 去重显示：按 (学号, 单号) 组合 */
+    int shown = 0;
+    for (int i = 0; i < overdue_count; i++) {
+        /* 跳过已显示过的单号 */
+        int dup = 0;
+        for (int j = 0; j < i; j++) {
+            if (strcmp(overdue[i].record_id, overdue[j].record_id) == 0 &&
+                strcmp(overdue[i].student_id, overdue[j].student_id) == 0) {
+                dup = 1;
+                break;
+            }
+        }
+        if (dup) continue;
+
+        double days = difftime(time(NULL), overdue[i].borrow_time) / 86400.0;
+        printf("  %-4d %-12s %-14s %-22s %.0f 天\n",
+               ++shown,
+               overdue[i].student_id,
+               overdue[i].student_name,
+               overdue[i].record_id,
+               days);
+    }
+    print_line();
+    printf("  共 %d 名学生存在逾期\n\n", shown);
+
+    /* 统计可循环工具逾期数量 */
+    int tool_overdue = 0;
+    for (int i = 0; i < overdue_count; i++) {
+        const Material* mat = material_find_by_id(overdue[i].material_id);
+        if (mat && mat->attr == ATTR_REUSABLE) {
+            tool_overdue += overdue[i].quantity;
+        }
+    }
+    printf("  逾期未归还工具总计: %d 件\n", tool_overdue);
+
+    free(overdue);
+    pause_screen();
+}
 
 /* ---- 预警盘点 ---- */
 static void menu_inventory_alert(void)    { placeholder("库存预警"); }
