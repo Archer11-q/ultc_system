@@ -1,0 +1,25 @@
+# CMake 构建输出
+build/
+cmake-build-*/
+
+# IDE 临时文件
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 编译产物
+*.o
+*.obj
+*.exe
+*.out
+
+# 运行时数据文件（程序首次运行自动生成）
+data/*.dat
+
+# 竞赛题目 PDF（不纳入版本管理）
+*.pdf
+
+# 竞赛交付物（体积大，单独提交竞赛平台）
+说明文档.pdf
+演示视频.mp4
