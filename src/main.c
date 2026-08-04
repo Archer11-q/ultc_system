@@ -8,6 +8,7 @@
 #include "platform.h"
 #include "auth.h"
 #include "material.h"
+#include "borrow.h"
 #include "ui.h"
 
 #include <stdio.h>
@@ -190,7 +191,194 @@ static void menu_material_list(void) {
 }
 
 /* ---- 领用归还 ---- */
-static void menu_borrow_new(void)      { placeholder("学生领用"); }
+
+/** 打印单次领用回执 */
+static void print_receipt(const char* record_id,
+                          const char* student_id, const char* student_name,
+                          const char* class_name, const char* project_id) {
+    int count = 0;
+    BorrowRecord* items = borrow_get_by_record_id(record_id, &count);
+    if (!items || count == 0) return;
+
+    double total_value = 0.0;
+
+    printf("\n");
+    print_separator();
+    printf("                    领 用 回 执\n");
+    print_separator();
+    printf("  领用单号 : %s\n", record_id);
+    printf("  学    号 : %s\n", student_id);
+    printf("  姓    名 : %s\n", student_name);
+    printf("  班    级 : %s\n", class_name);
+    printf("  实训项目 : %s\n", project_id);
+
+    char time_buf[32];
+    struct tm* tm = localtime(&items[0].borrow_time);
+    strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", tm);
+    printf("  领用时间 : %s\n", time_buf);
+    printf("  操作员   : %s\n", items[0].operator_name);
+    print_line();
+    printf("  %-4s %-16s %-20s %-8s %s\n",
+           "序号", "耗材编号", "耗材名称", "数量", "类型");
+    print_line();
+
+    for (int i = 0; i < count; i++) {
+        const Material* mat = material_find_by_id(items[i].material_id);
+        const char* mat_name = mat ? mat->name : "（已删除）";
+        const char* type = (mat && mat->attr == ATTR_DISPOSABLE)
+                               ? "一次性" : "可循环";
+        double item_val = mat ? (mat->unit_price * items[i].quantity) : 0.0;
+        total_value += item_val;
+
+        printf("  %-4d %-16s %-20s %-8d %s\n",
+               i + 1, items[i].material_id, mat_name,
+               items[i].quantity, type);
+    }
+    print_line();
+    printf("  合计价值: ￥%.2f\n", total_value);
+    print_separator();
+
+    free(items);
+}
+
+static void menu_borrow_new(void) {
+    print_title("学生耗材领用");
+
+    /* 检查是否有耗材可领 */
+    if (material_count() == 0) {
+        printf("\n  [提示] 耗材库为空，请先添加耗材。\n");
+        pause_screen();
+        return;
+    }
+
+    /* 1. 录入学生信息 */
+    char student_id[MAX_STUDENT_ID];
+    char student_name[MAX_STUDENT_NAME];
+    char class_name[MAX_CLASS_NAME];
+    char project_id[MAX_PROJECT_ID];
+
+    printf("\n  ── 学生信息 ──\n");
+    read_string("  学号: ",        student_id,   sizeof(student_id));
+    read_string("  姓名: ",        student_name, sizeof(student_name));
+    read_string("  班级: ",        class_name,   sizeof(class_name));
+    read_string("  实训项目编号: ", project_id,   sizeof(project_id));
+
+    /* 2. 生成领用单号 */
+    char record_id[MAX_RECORD_ID];
+    borrow_gen_id(record_id, sizeof(record_id));
+
+    /* 3. 循环选择耗材 */
+    int item_count = 0;
+    int running = 1;
+    while (running) {
+        /* 显示耗材列表供选择 */
+        int total_pages = 0;
+        material_list_page(1, &total_pages);
+
+        printf("\n  ── 领用单号: %s ──\n", record_id);
+        printf("  已添加 %d 种耗材\n", item_count);
+
+        printf("\n  1. 添加耗材到领用单\n");
+        printf("  2. 完成领用\n");
+        printf("  0. 取消领用\n");
+
+        int choice = read_int("\n  请选择: ", 0, 2);
+        if (choice == 0 || choice == 2) { running = 0; }
+        if (choice == 0) {
+            /* 取消：归还已扣减的库存（一次性耗材） */
+            int cnt = 0;
+            BorrowRecord* items = borrow_get_by_record_id(record_id, &cnt);
+            if (items) {
+                for (int i = 0; i < cnt; i++) {
+                    const Material* mat = material_find_by_id(
+                        items[i].material_id);
+                    if (mat && mat->attr == ATTR_DISPOSABLE) {
+                        material_increase_stock(items[i].material_id,
+                                                items[i].quantity);
+                    }
+                }
+                free(items);
+            }
+            printf("\n  [提示] 领用已取消。\n");
+            pause_screen();
+            return;
+        }
+        if (choice == 2) break;
+
+        /* 选择耗材 */
+        if (choice != 1) continue;
+
+        char mat_id[MAX_MAT_ID];
+        int quantity;
+        read_string("\n  耗材编号: ", mat_id, sizeof(mat_id));
+
+        const Material* mat = material_find_by_id(mat_id);
+        if (!mat) {
+            printf("  [错误] 耗材 '%s' 不存在。\n", mat_id);
+            pause_screen();
+            continue;
+        }
+
+        printf("  耗材: %s | 分类: %s | 属性: %s | 库存: %d | 单价: %.2f\n",
+               mat->name, material_category_name(mat->category),
+               material_attr_name(mat->attr),
+               mat->total_stock, mat->unit_price);
+
+        quantity = read_int("  领用数量: ", 1, 99999);
+
+        /* 规则校验 */
+        if (mat->attr == ATTR_DISPOSABLE) {
+            /* 一次性耗材：库存充足才可领用 */
+            if (mat->total_stock < quantity) {
+                set_color_red();
+                printf("  [错误] 库存不足！当前库存 %d，需要 %d。\n",
+                       mat->total_stock, quantity);
+                reset_color();
+                pause_screen();
+                continue;
+            }
+            /* 扣减库存 */
+            material_reduce_stock(mat_id, quantity);
+        }
+        /* 可循环耗材：仅登记，不扣库存 */
+
+        /* 创建领用记录 */
+        BorrowRecord rec;
+        memset(&rec, 0, sizeof(rec));
+        strncpy(rec.record_id,    record_id,    sizeof(rec.record_id) - 1);
+        strncpy(rec.student_id,   student_id,   sizeof(rec.student_id) - 1);
+        strncpy(rec.student_name, student_name, sizeof(rec.student_name) - 1);
+        strncpy(rec.class_name,   class_name,   sizeof(rec.class_name) - 1);
+        strncpy(rec.project_id,   project_id,   sizeof(rec.project_id) - 1);
+        strncpy(rec.material_id,  mat_id,       sizeof(rec.material_id) - 1);
+        rec.quantity    = quantity;
+        rec.borrow_time = time(NULL);
+        rec.status      = BORROW_ACTIVE;
+        strncpy(rec.operator_name, auth_current_user(),
+                sizeof(rec.operator_name) - 1);
+
+        borrow_create(&rec);
+        item_count++;
+
+        set_color_green();
+        printf("  [提示] 已添加: %s × %d\n", mat->name, quantity);
+        reset_color();
+        pause_screen();
+    }
+
+    if (item_count == 0) {
+        printf("\n  [提示] 未添加任何耗材，领用已取消。\n");
+        pause_screen();
+        return;
+    }
+
+    /* 4. 打印回执 */
+    print_title("领用回执");
+    print_receipt(record_id, student_id, student_name,
+                  class_name, project_id);
+    pause_screen();
+}
+
 static void menu_borrow_return(void)   { placeholder("耗材归还"); }
 static void menu_borrow_overdue(void)  { placeholder("逾期管理"); }
 
@@ -472,6 +660,12 @@ int main(void) {
         auth_shutdown();
         return 1;
     }
+    if (borrow_init() != 0) {
+        fprintf(stderr, "[致命错误] 领用模块初始化失败，程序退出。\n");
+        material_shutdown();
+        auth_shutdown();
+        return 1;
+    }
 
     /* 主循环 */
     int running = 1;
@@ -495,6 +689,7 @@ int main(void) {
         }
     }
 
+    borrow_shutdown();
     material_shutdown();
     auth_shutdown();
     printf("\n  感谢使用，再见！\n");
