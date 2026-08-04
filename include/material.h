@@ -105,6 +105,13 @@ int material_scrap(const char* material_id, int quantity,
                    const char* reason, const char* operator_name);
 
 /**
+ * @brief 获取全部报废记录
+ * @param out_count 输出参数
+ * @return 报废记录数组（调用方 free）
+ */
+ScrapRecord* material_scrap_get_all(int* out_count);
+
+/**
  * @brief 列出全部报废记录（分页）
  * @param page       页码（从 1 开始）
  * @param total_pages 输出参数，总页数

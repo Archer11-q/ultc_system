@@ -11,6 +11,7 @@
 #include "borrow.h"
 #include "inventory.h"
 #include "search.h"
+#include "stats.h"
 #include "ui.h"
 
 #include <stdio.h>
@@ -20,11 +21,6 @@
 /* ============================================================
  * 占位函数（后续版本实现）
  * ============================================================ */
-
-static void placeholder(const char* module) {
-    printf("\n  [提示] %s 模块将在后续版本中实现。\n", module);
-    pause_screen();
-}
 
 /* ---- 耗材管理 ---- */
 
@@ -661,7 +657,7 @@ static void menu_search_material(void) { search_material_menu(); }
 static void menu_search_record(void)   { search_record_menu(); }
 
 /* ---- 统计 ---- */
-static void menu_stats(void)           { placeholder("数据统计"); }
+static void menu_stats(void)           { stats_menu(); }
 
 /* ============================================================
  * 登录流程

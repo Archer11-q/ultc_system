@@ -29,6 +29,7 @@ add_library(ultc_lib STATIC
     src/borrow.c
     src/inventory.c
     src/search.c
+    src/stats.c
 )
 target_include_directories(ultc_lib PUBLIC include)
 
@@ -58,6 +59,9 @@ target_link_libraries(test_inventory PRIVATE ultc_lib)
 
 add_executable(test_search tests/test_search.c)
 target_link_libraries(test_search PRIVATE ultc_lib)
+
+add_executable(test_stats tests/test_stats.c)
+target_link_libraries(test_stats PRIVATE ultc_lib)
 
 # ============================================================
 # 后续版本测试 target 占位：

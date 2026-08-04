@@ -309,6 +309,26 @@ int material_scrap(const char* material_id, int quantity,
     return 0;
 }
 
+ScrapRecord* material_scrap_get_all(int* out_count) {
+    *out_count = 0;
+    int total = 0;
+    ScrapRecord* p = g_scrap_list;
+    while (p) { total++; p = p->next; }
+    if (total == 0) return NULL;
+
+    ScrapRecord* arr = (ScrapRecord*)malloc(sizeof(ScrapRecord) * total);
+    if (!arr) return NULL;
+
+    p = g_scrap_list;
+    for (int i = 0; i < total; i++) {
+        arr[i] = *p;
+        arr[i].next = NULL;
+        p = p->next;
+    }
+    *out_count = total;
+    return arr;
+}
+
 void material_scrap_list(int page, int* total_pages) {
     if (page < 1) page = 1;
 
