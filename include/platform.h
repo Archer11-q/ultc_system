@@ -60,7 +60,9 @@ static inline void pause_screen(void) {
     system("pause");
 #else
     printf("按回车键继续...");
-    getchar();
+    /* 消费整行以避免管道输入时错位 */
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF) {}
 #endif
 }
 

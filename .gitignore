@@ -22,7 +22,10 @@ CLAUDE.md
 
 # 竞赛题目 PDF（不纳入版本管理）
 *.pdf
+!docs/*.pdf
+
+# 截图中间产物（不纳入版本管理）
+docs/screenshots/
 
 # 竞赛交付物（体积大，单独提交竞赛平台）
-说明文档.pdf
 演示视频.mp4

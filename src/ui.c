@@ -60,7 +60,8 @@ int read_int(const char *prompt, int min, int max) {
     while (1) {
         printf("%s", prompt);
         if (!fgets(buf, sizeof(buf), stdin)) {
-            continue;
+            /* stdin EOF（管道关闭或 Ctrl+D），终止程序 */
+            exit(0);
         }
 
         /* 如果输入过长（没读完一行），清掉剩余字符 */
