@@ -449,3 +449,82 @@ const char* material_attr_name(int attr) {
     default:              return "未知";
     }
 }
+
+/* ============================================================
+ * 库存预警与采购清单
+ * ============================================================ */
+
+void material_alert_print(void) {
+    Material* p = g_mat_list;
+    int count = 0;
+
+    /* 先统计 */
+    while (p) {
+        if (p->total_stock < p->min_stock) count++;
+        p = p->next;
+    }
+
+    if (count == 0) {
+        printf("\n  [提示] 所有耗材库存充足，无需预警。\n");
+        return;
+    }
+
+    printf("\n");
+    printf("  %-12s %-20s %6s %5s %s\n",
+           "编号", "名称", "库存", "预警", "存放柜号");
+    print_line();
+
+    p = g_mat_list;
+    while (p) {
+        if (p->total_stock < p->min_stock) {
+            set_color_red();
+            printf("  %-12s %-20s %6d %5d %s\n",
+                   p->id, p->name, p->total_stock, p->min_stock, p->cabinet);
+            reset_color();
+        }
+        p = p->next;
+    }
+    print_line();
+    printf("  共 %d 种耗材低于预警库存\n", count);
+}
+
+void material_purchase_list(void) {
+    /* 先统计预警项 */
+    int count = 0;
+    double total_cost = 0.0;
+    Material* p = g_mat_list;
+    while (p) {
+        if (p->total_stock < p->min_stock) count++;
+        p = p->next;
+    }
+
+    if (count == 0) {
+        printf("\n  [提示] 所有耗材库存充足，无需采购。\n");
+        return;
+    }
+
+    printf("\n");
+    print_separator();
+    printf("                    采 购 清 单\n");
+    print_separator();
+    printf("  %-12s %-20s %6s %5s %6s %8s %s\n",
+           "编号", "名称", "库存", "预警", "建议采购", "单价", "预估金额");
+    print_line();
+
+    p = g_mat_list;
+    while (p) {
+        if (p->total_stock < p->min_stock) {
+            int suggest = p->min_stock * 2 - p->total_stock;
+            double cost = suggest * p->unit_price;
+            total_cost += cost;
+
+            printf("  %-12s %-20s %6d %5d %6d %8.2f %8.2f\n",
+                   p->id, p->name, p->total_stock, p->min_stock,
+                   suggest, p->unit_price, cost);
+        }
+        p = p->next;
+    }
+    print_line();
+    printf("  %63s %8.2f\n", "采购总金额: ￥", total_cost);
+    print_separator();
+}

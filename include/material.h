@@ -137,6 +137,22 @@ const char* material_category_name(int category);
  */
 const char* material_attr_name(int attr);
 
+/* ============================================================
+ * 库存预警与采购清单
+ * ============================================================ */
+
+/**
+ * @brief 打印库存预警清单（所有 total_stock < min_stock 的耗材）
+ */
+void material_alert_print(void);
+
+/**
+ * @brief 打印采购清单
+ * @details 列出所有预警耗材，含建议采购量（min_stock × 2 - total_stock）
+ *          和预估金额，底部汇总总金额。
+ */
+void material_purchase_list(void);
+
 #ifdef __cplusplus
 }
 #endif

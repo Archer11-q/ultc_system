@@ -9,6 +9,7 @@
 #include "auth.h"
 #include "material.h"
 #include "borrow.h"
+#include "inventory.h"
 #include "ui.h"
 
 #include <stdio.h>
@@ -547,8 +548,112 @@ static void menu_borrow_overdue(void) {
 }
 
 /* ---- 预警盘点 ---- */
-static void menu_inventory_alert(void)    { placeholder("库存预警"); }
-static void menu_inventory_stocktake(void) { placeholder("库存盘点"); }
+
+static void menu_inventory_alert(void) {
+    print_title("库存预警");
+
+    if (material_count() == 0) {
+        printf("\n  [提示] 耗材库为空。\n");
+        pause_screen();
+        return;
+    }
+
+    material_alert_print();
+
+    printf("\n");
+    if (confirm("  是否生成采购清单？")) {
+        material_purchase_list();
+    }
+    pause_screen();
+}
+
+static void menu_inventory_stocktake(void) {
+    print_title("库存盘点");
+
+    if (material_count() == 0) {
+        printf("\n  [提示] 耗材库为空，无需盘点。\n");
+        pause_screen();
+        return;
+    }
+
+    /* 先展示当前耗材概览 */
+    int total_pages = 0;
+    material_list_page(1, &total_pages);
+
+    printf("\n  ── 盘点操作 ──\n");
+    if (!confirm("\n  是否开始逐项盘点？")) return;
+
+    /* 逐项盘点：需要遍历所有耗材。
+     * 因为 material 模块不提供 get_all 迭代器，
+     * 采用 "按编号输入" 的方式：操作员对照货架逐一输入。
+     */
+    int checked = 0;
+    int corrected = 0;
+    int running = 1;
+
+    while (running) {
+        printf("\n  ── 已盘点 %d 种耗材 ──\n", checked);
+
+        char mat_id[MAX_MAT_ID];
+        read_string("  耗材编号（输入 0 结束盘点）: ", mat_id, sizeof(mat_id));
+
+        if (strcmp(mat_id, "0") == 0) {
+            running = 0;
+            break;
+        }
+
+        const Material* mat = material_find_by_id(mat_id);
+        if (!mat) {
+            printf("  [错误] 耗材 '%s' 不存在。\n", mat_id);
+            continue;
+        }
+
+        printf("  耗材: %s | 账面库存: %d | 分类: %s\n",
+               mat->name, mat->total_stock,
+               material_category_name(mat->category));
+
+        int actual = read_int("  实际库存: ", 0, 999999);
+
+        int auto_correct = 0;
+        if (actual != mat->total_stock) {
+            set_color_yellow();
+            printf("  差异: %+d（账面 %d → 实际 %d）\n",
+                   actual - mat->total_stock,
+                   mat->total_stock, actual);
+            reset_color();
+
+            if (confirm("  是否用实际值修正账面库存？")) {
+                auto_correct = 1;
+                corrected++;
+            }
+        } else {
+            printf("  库存一致，无需修正。\n");
+        }
+
+        int diff = inventory_stocktake_item(mat_id, actual,
+                                             auth_current_user(),
+                                             auto_correct);
+        if (diff != -999999) {
+            checked++;
+            if (auto_correct) {
+                set_color_green();
+                printf("  [提示] 已修正，差异 %+d。\n", diff);
+                reset_color();
+            }
+        }
+    }
+
+    printf("\n  [提示] 盘点完成。共盘点 %d 种耗材，修正 %d 项差异。\n",
+           checked, corrected);
+
+    /* 显示盘点日志 */
+    if (checked > 0 && confirm("\n  是否查看本次盘点日志？")) {
+        int log_pages = 0;
+        inventory_log_page(1, &log_pages);
+    }
+
+    pause_screen();
+}
 
 /* ---- 检索 ---- */
 static void menu_search_material(void) { placeholder("耗材检索"); }
@@ -830,6 +935,13 @@ int main(void) {
         auth_shutdown();
         return 1;
     }
+    if (inventory_init() != 0) {
+        fprintf(stderr, "[致命错误] 盘点模块初始化失败，程序退出。\n");
+        borrow_shutdown();
+        material_shutdown();
+        auth_shutdown();
+        return 1;
+    }
 
     /* 主循环 */
     int running = 1;
@@ -853,6 +965,7 @@ int main(void) {
         }
     }
 
+    inventory_shutdown();
     borrow_shutdown();
     material_shutdown();
     auth_shutdown();
